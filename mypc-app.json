@@ -3,7 +3,7 @@
   "id": "hr-monitor",
   "name": "HR monitor",
   "description": "HR monitor",
-  "type": "app",
+  "type": "game",
   "entry": "index.html",
   "icon": "icon.svg",
   "version": "1.0.1",
