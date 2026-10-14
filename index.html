@@ -31,7 +31,7 @@
     <!-- Google Fonts Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
-    <script src="https://imad-os.github.io/g/sdk/mypc-sdk.js?v=hr-ble-1"></script>
+    <script src="https://imad-os.github.io/g/sdk/mypc-sdk.js?v=hr-ble-picker-1"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -366,6 +366,28 @@ textarea:focus {
         Garmin Forerunner 55 Web Bluetooth HR Monitor &bull; Standard BLE 0x180D
     </footer>
 
+    <!-- HR BLE device picker v1: selection UI for Samsung TV / My PC. -->
+    <div id="hr-device-picker" class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-200 p-4">
+        <div id="hr-device-picker-card" class="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+            <div class="px-6 py-5 border-b border-slate-800 flex items-center justify-between gap-4">
+                <div>
+                    <h2 class="font-bold text-xl text-white">Choose heart-rate sensor</h2>
+                    <p class="text-sm text-slate-400 mt-1">Select a watch or BLE heart-rate monitor using your TV remote.</p>
+                </div>
+                <span class="text-2xl" aria-hidden="true">⌚</span>
+            </div>
+            <div class="px-6 pt-4">
+                <p id="hr-device-picker-status" class="text-sm text-cyan-300" aria-live="polite">Ready to scan.</p>
+            </div>
+            <div id="hr-device-list" class="px-6 py-4 overflow-y-auto flex-1 min-h-[160px] space-y-3">
+                <div class="text-slate-400 text-sm py-8 text-center">Press Scan to find nearby heart-rate sensors.</div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-800 flex flex-wrap justify-end gap-3">
+                <button id="hr-device-picker-rescan" type="button" onclick="scanHeartRateDevices()" class="px-5 py-3 bg-cyan-700 hover:bg-cyan-600 text-white rounded-xl font-semibold">Scan again</button>
+                <button id="hr-device-picker-cancel" type="button" onclick="closeHrDevicePicker(true)" class="px-5 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold">Cancel</button>
+            </div>
+        </div>
+    </div>
     <div id="tutorial-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 p-4">
         <div id="tutorial-card" class="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300 flex flex-col max-h-[85vh]">
             
@@ -542,6 +564,157 @@ if (document.readyState === 'loading') {
 
         /* HR BLE bridge v1: use native host BLE in My PC and Web Bluetooth elsewhere. */
         var hostBleConnecting = false;
+        /* HR BLE device picker v1: user selects a discovered sensor; never auto-connect to the first result. */
+        var hrDevicePickerOpen = false;
+        var hrDiscoveredDevices = Object.create(null);
+        var hrDeviceOrder = [];
+        var hrScanGeneration = 0;
+        var hrScanInFlight = false;
+
+        function showHrDevicePicker(show) {
+            var modal = document.getElementById('hr-device-picker');
+            if (!modal) return;
+            if (show) {
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                modal.classList.add('opacity-100');
+            } else {
+                modal.classList.remove('opacity-100');
+                modal.classList.add('opacity-0', 'pointer-events-none');
+            }
+            hrDevicePickerOpen = !!show;
+        }
+        function renderHrDeviceList(emptyMessage) {
+            var list = document.getElementById('hr-device-list');
+            if (!list) return;
+            list.innerHTML = '';
+            if (!hrDeviceOrder.length) {
+                var empty = document.createElement('div');
+                empty.className = 'text-slate-400 text-sm py-8 text-center';
+                empty.textContent = emptyMessage || 'Searching for heart-rate sensors…';
+                list.appendChild(empty);
+                return;
+            }
+            hrDeviceOrder.forEach(function (id) {
+                var item = hrDiscoveredDevices[id];
+                if (!item) return;
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'w-full text-left flex items-center gap-4 p-4 rounded-2xl border border-slate-700 bg-slate-800 hover:bg-slate-700 focus:bg-slate-700 transition-colors';
+                button.setAttribute('data-device-id', item.id);
+                var icon = document.createElement('span');
+                icon.className = 'flex-shrink-0 w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-2xl';
+                icon.textContent = '⌚';
+                var body = document.createElement('span');
+                body.className = 'flex-1 min-w-0';
+                var name = document.createElement('span');
+                name.className = 'block text-base font-semibold text-white break-words';
+                name.textContent = item.name || 'Unnamed heart-rate sensor';
+                var address = document.createElement('span');
+                address.className = 'block text-xs text-slate-400 mt-1 break-all';
+                address.textContent = item.address ? 'Bluetooth address: ' + item.address : 'Heart-rate service candidate';
+                var action = document.createElement('span');
+                action.className = 'flex-shrink-0 text-cyan-300 font-semibold';
+                action.textContent = 'Connect  ›';
+                body.appendChild(name);
+                body.appendChild(address);
+                button.appendChild(icon);
+                button.appendChild(body);
+                button.appendChild(action);
+                button.addEventListener('click', function () { connectToHrDevice(item.id); });
+                list.appendChild(button);
+            });
+        }
+        function handleHrHostDeviceFound(event) {
+            var item = event && (event.device || event);
+            if (!item || !item.id) return;
+            if (!hrDiscoveredDevices[item.id]) hrDeviceOrder.push(item.id);
+            hrDiscoveredDevices[item.id] = item;
+            if (hrDevicePickerOpen) renderHrDeviceList();
+        }
+        function openHrDevicePicker() {
+            if (!isMyPcBluetoothMode()) return;
+            hrDiscoveredDevices = Object.create(null);
+            hrDeviceOrder = [];
+            showHrDevicePicker(true);
+            var status = document.getElementById('hr-device-picker-status');
+            if (status) status.textContent = 'Scanning for nearby heart-rate sensors…';
+            renderHrDeviceList('Scanning… keep your watch awake and enable Broadcast Heart Rate.');
+            hostBleConnecting = true;
+            connText.textContent = 'Scanning for sensors…';
+            connDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+            connectBtnText.textContent = 'Searching…';
+            var rescan = document.getElementById('hr-device-picker-rescan');
+            if (rescan) rescan.focus();
+            scanHeartRateDevices();
+        }
+        async function scanHeartRateDevices() {
+            if (!isMyPcBluetoothMode() || !hrDevicePickerOpen) return;
+            var generation = ++hrScanGeneration;
+            if (hrScanInFlight) {
+                try { await MyPC.bluetooth.cancelScan(); } catch (e) {}
+            }
+            if (generation !== hrScanGeneration || !hrDevicePickerOpen) return;
+            hrDiscoveredDevices = Object.create(null);
+            hrDeviceOrder = [];
+            hrScanInFlight = true;
+            var status = document.getElementById('hr-device-picker-status');
+            if (status) status.textContent = 'Scanning for 10 seconds… select a sensor when it appears.';
+            renderHrDeviceList('Scanning… keep your watch awake and enable Broadcast Heart Rate.');
+            try {
+                var result = await MyPC.bluetooth.scan();
+                if (generation !== hrScanGeneration || !hrDevicePickerOpen) return;
+                var devices = result && result.devices ? result.devices : [];
+                devices.forEach(handleHrHostDeviceFound);
+                if (status) status.textContent = hrDeviceOrder.length
+                    ? 'Found ' + hrDeviceOrder.length + ' compatible heart-rate sensor(s). Select one to connect.'
+                    : 'No compatible heart-rate sensors found. Wake your watch, enable Broadcast Heart Rate, then scan again.';
+                renderHrDeviceList('No compatible heart-rate sensors found. Wake your watch and scan again.');
+            } catch (error) {
+                if (generation !== hrScanGeneration) return;
+                var message = error && error.message ? error.message : 'Could not scan for Bluetooth devices.';
+                if (/cancel|selected/i.test(message) && !hrDevicePickerOpen) return;
+                if (status) status.textContent = message;
+                renderHrDeviceList('Scan failed. Check Bluetooth availability and try again.');
+                if (!/cancel|selected/i.test(message)) console.error('My PC HR device scan failed:', error);
+            } finally {
+                if (generation === hrScanGeneration) hrScanInFlight = false;
+            }
+        }
+        function closeHrDevicePicker(cancelScan) {
+            showHrDevicePicker(false);
+            hrScanGeneration++;
+            if (cancelScan && isMyPcBluetoothMode()) {
+                MyPC.bluetooth.cancelScan().catch(function () {});
+                hrScanInFlight = false;
+                hostBleConnecting = false;
+                if (!isConnected) setConnectionButtonDisconnected();
+            }
+        }
+        async function connectToHrDevice(deviceId) {
+            if (!isMyPcBluetoothMode() || !deviceId) return;
+            var selected = hrDiscoveredDevices[deviceId];
+            if (!selected) {
+                showToast('That sensor is no longer in the scan list. Scan again.', '⚠️');
+                return;
+            }
+            showHrDevicePicker(false);
+            hrScanGeneration++;
+            hrScanInFlight = false;
+            hostBleConnecting = true;
+            connText.textContent = 'Connecting to ' + (selected.name || 'heart-rate sensor') + '…';
+            connDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+            connectBtnText.textContent = 'Connecting…';
+            try {
+                await MyPC.bluetooth.connect(deviceId);
+            } catch (error) {
+                hostBleConnecting = false;
+                console.error('My PC BLE connection failed:', error);
+                if (!isConnected) setConnectionButtonDisconnected();
+                var message = error && error.message ? error.message : 'Could not connect to the selected sensor.';
+                if (!/cancel|selected/i.test(message)) showToast(message, '⚠️');
+            }
+        }
+
         function isMyPcBluetoothMode() {
             return !!(window.MyPC && typeof MyPC.isHosted === 'function' && MyPC.isHosted() &&
                 MyPC.bluetooth && typeof MyPC.bluetooth.connect === 'function');
@@ -568,23 +741,7 @@ if (document.readyState === 'loading') {
             if (isConnected) { disconnectDevice(); return; }
 
             if (isMyPcBluetoothMode()) {
-                hostBleConnecting = true;
-                connText.textContent = 'Scanning for heart-rate sensor…';
-                connDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
-                connectBtnText.textContent = 'Searching…';
-                try {
-                    await MyPC.bluetooth.connect();
-                    /* The connected status event updates the UI. */
-                } catch (error) {
-                    hostBleConnecting = false;
-                    console.error('My PC BLE connection failed:', error);
-                    /* The host normally sends a status/error event as well; this is a fallback. */
-                    if (!isConnected) {
-                        setConnectionButtonDisconnected();
-                        var connectError = error && error.message ? error.message : 'Could not connect to a heart-rate sensor.';
-                        if (!/cancel/i.test(connectError)) showToast(connectError, '⚠️');
-                    }
-                }
+                openHrDevicePicker();
                 return;
             }
 
@@ -1050,29 +1207,20 @@ if (document.readyState === 'loading') {
         }
 
 function getRemoteFocusable() {
-    var modal = document.getElementById('tutorial-modal');
-    var modalOpen = modal &&
-        modal.classList.contains('opacity-100');
-
-    return Array.prototype.slice.call(
-        document.querySelectorAll(
-            'button:not([disabled]), a[href], ' +
-            'input:not([disabled]), select:not([disabled]), ' +
-            'textarea:not([disabled])'
-        )
-    ).filter(function (element) {
-        if (element.closest('#tutorial-modal') && !modalOpen) {
-            return false;
-        }
-
+    var picker = document.getElementById('hr-device-picker');
+    var pickerOpen = picker && picker.classList.contains('opacity-100');
+    var tutorial = document.getElementById('tutorial-modal');
+    var tutorialOpen = tutorial && tutorial.classList.contains('opacity-100');
+    return Array.prototype.slice.call(document.querySelectorAll(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
+    )).filter(function (element) {
+        if (pickerOpen) return !!element.closest('#hr-device-picker');
+        if (tutorialOpen) return !!element.closest('#tutorial-modal');
+        if (element.closest('#hr-device-picker') || element.closest('#tutorial-modal')) return false;
         var style = window.getComputedStyle(element);
-
-        return style.display !== 'none' &&
-            style.visibility !== 'hidden' &&
-            element.getClientRects().length > 0;
+        return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
     });
 }
-
 function moveRemoteFocus(direction) {
     var items = getRemoteFocusable();
 
@@ -1127,35 +1275,23 @@ function moveRemoteFocus(direction) {
 
 function handleMyPcInput(action, pressed) {
     if (!pressed) return;
-
-    var modal = document.getElementById('tutorial-modal');
-    var modalOpen = modal &&
-        modal.classList.contains('opacity-100');
-
+    var picker = document.getElementById('hr-device-picker');
+    var pickerOpen = picker && picker.classList.contains('opacity-100');
+    var tutorial = document.getElementById('tutorial-modal');
+    var tutorialOpen = tutorial && tutorial.classList.contains('opacity-100');
     if (action === 'cancel') {
-        if (modalOpen) toggleTutorialModal(false);
+        if (pickerOpen) closeHrDevicePicker(true);
+        else if (tutorialOpen) toggleTutorialModal(false);
         return;
     }
-
     if (action === 'confirm') {
         var items = getRemoteFocusable();
         var active = document.activeElement;
-
-        if (items.indexOf(active) !== -1) {
-            active.click();
-        } else if (items.length) {
-            items[0].focus();
-        }
-
+        if (items.indexOf(active) !== -1) active.click();
+        else if (items.length) items[0].focus();
         return;
     }
-
-    if (
-        action === 'left' ||
-        action === 'right' ||
-        action === 'up' ||
-        action === 'down'
-    ) {
+    if (action === 'left' || action === 'right' || action === 'up' || action === 'down') {
         moveRemoteFocus(action);
     }
 }
@@ -1167,6 +1303,7 @@ function handleMyPcInput(action, pressed) {
             if (hostBleHandlersInstalled || !isMyPcBluetoothMode()) return;
             hostBleHandlersInstalled = true;
             setSimulationButtonState(false);
+            hostBleUnsubscribers.push(MyPC.bluetooth.on('device-found', handleHrHostDeviceFound));
             hostBleUnsubscribers.push(MyPC.bluetooth.on('reading', function (reading) {
                 if (!reading || typeof reading.bpm !== 'number' || reading.bpm <= 0) return;
                 updateTelemetry(reading.bpm,
@@ -1176,6 +1313,13 @@ function handleMyPcInput(action, pressed) {
             }));
             hostBleUnsubscribers.push(MyPC.bluetooth.on('status', function (event) {
                 if (!event || !event.status) return;
+                if (hrDevicePickerOpen && event.status === 'scanning') {
+                    var pickerStatus = document.getElementById('hr-device-picker-status');
+                    if (pickerStatus) pickerStatus.textContent = event.message || 'Scanning for heart-rate sensors…';
+                } else if (hrDevicePickerOpen && event.status === 'scan-complete') {
+                    var doneStatus = document.getElementById('hr-device-picker-status');
+                    if (doneStatus && !hrDeviceOrder.length) doneStatus.textContent = 'No compatible sensors found. Wake your watch and scan again.';
+                }
                 if (event.status === 'test') {
                     hostBleConnecting = false;
                     isConnected = false;
@@ -1199,6 +1343,9 @@ function handleMyPcInput(action, pressed) {
                     connDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
                     connectBtnText.textContent = 'Connecting…';
                 } else if (event.status === 'connected') {
+                    showHrDevicePicker(false);
+                    hrScanGeneration++;
+                    hrScanInFlight = false;
                     hostBleConnecting = false;
                     isSimulating = false;
                     setSimulationButtonState(false);
