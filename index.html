@@ -51,7 +51,6 @@
         .animate-heart {
             animation: heartbeat 1s infinite ease-in-out;
         }
-        /* Custom scrollbar for mobile sleekness */
         ::-webkit-scrollbar {
             width: 4px;
             height: 4px;
@@ -67,7 +66,6 @@
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-rose-500 selection:text-white">
 
-    <!-- Toast Notification Banner -->
     <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 transition-all duration-300 opacity-0 pointer-events-none translate-y-[-20px]">
         <div id="toast-content" class="bg-slate-800 border border-slate-700 text-slate-100 px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 text-sm">
             <span id="toast-icon">ℹ️</span>
@@ -75,7 +73,6 @@
         </div>
     </div>
 
-    <!-- Top Navigation Bar -->
     <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-4 py-3 flex items-center justify-between">
         <div class="flex items-center space-x-2">
             <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-rose-500 to-orange-500 flex items-center justify-center shadow-lg shadow-rose-500/20">
@@ -90,13 +87,11 @@
         </div>
 
         <div class="flex items-center space-x-2">
-            <!-- Connection Status Pill -->
             <div id="conn-status-pill" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-medium text-slate-300">
                 <span id="conn-dot" class="w-2 h-2 rounded-full bg-amber-500"></span>
                 <span id="conn-text">Disconnected</span>
             </div>
-            <!-- Tutorial Toggle Button -->
-            <button onclick="toggleTutorialModal(true)" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors" title="Garmin Setup Tutorial">
+            <button onclick="toggleTutorialModal(true)" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors" title="Garmin PC Setup Tutorial">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
@@ -104,16 +99,20 @@
         </div>
     </header>
 
-    <!-- Main Container -->
     <main class="flex-1 max-w-lg w-full mx-auto p-4 space-y-4 pb-24">
 
-        <!-- Browser Compatibility Warning (Hidden by default, shown if no Web Bluetooth) -->
+        <!-- PC Compatibility & Connection Helper Banner -->
         <div id="ble-warning" class="hidden bg-amber-950/40 border border-amber-800/60 rounded-2xl p-4 text-xs text-amber-200 leading-relaxed">
             <div class="flex items-start space-x-3">
-                <span class="text-lg">⚠️</span>
+                <span class="text-lg">💻</span>
                 <div>
-                    <strong class="font-semibold block mb-1">Web Bluetooth Not Available</strong>
-                    Your current browser does not support Web Bluetooth (e.g. iOS Safari). Please use <strong>Google Chrome</strong> or Microsoft Edge on Android, Windows, or Mac to connect directly to your Garmin FR55.
+                    <strong class="font-semibold block mb-1">PC Bluetooth Setup Info</strong>
+                    To connect your Garmin FR55 directly to your PC:
+                    <ul class="list-disc list-inside mt-1 space-y-1 text-[11px] text-amber-300">
+                        <li>Ensure Bluetooth is turned ON in Windows/macOS Settings.</li>
+                        <li>Use <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>.</li>
+                        <li>Enable <strong>"Broadcast Heart Rate"</strong> on your Garmin Watch face.</li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -138,9 +137,7 @@
             </div>
         </div>
 
-        <!-- Main Heart Rate Dashboard Card -->
         <div class="bg-gradient-to-b from-slate-800 to-slate-850 border border-slate-700/80 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
-            <!-- Background Glow effect -->
             <div class="absolute -top-12 -right-12 w-40 h-40 bg-rose-500/10 rounded-full blur-3xl pointer-events-none"></div>
             <div class="absolute -bottom-12 -left-12 w-40 h-40 bg-orange-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -149,14 +146,12 @@
                     <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
                     <span class="text-xs font-semibold tracking-wider uppercase text-slate-400">Live Heart Rate</span>
                 </div>
-                <!-- Sensor Contact Badge -->
                 <div id="contact-badge" class="px-2.5 py-1 rounded-md bg-slate-900/60 border border-slate-700 text-[10px] font-medium text-slate-400 flex items-center space-x-1.5">
                     <svg class="w-3 h-3 text-slate-500" id="contact-icon" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
                     <span id="contact-text">Sensor: Waiting</span>
                 </div>
             </div>
 
-            <!-- Giant BPM Display -->
             <div class="flex items-baseline justify-center my-6 space-x-3">
                 <div id="bpm-display" class="mono-font text-7xl sm:text-8xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-slate-300">
                     --
@@ -164,7 +159,6 @@
                 <div class="text-rose-500 font-bold text-xl sm:text-2xl uppercase tracking-wider">BPM</div>
             </div>
 
-            <!-- Pulsing Heart Animation Container -->
             <div class="flex justify-center mb-6">
                 <div id="heart-container" class="p-3 bg-rose-500/10 border border-rose-500/20 rounded-full text-rose-500 transition-transform duration-150">
                     <svg class="w-8 h-8 animate-heart" fill="currentColor" viewBox="0 0 24 24">
@@ -173,7 +167,6 @@
                 </div>
             </div>
 
-            <!-- Workout Session Timer Bar -->
             <div class="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-4 flex items-center justify-between">
                 <div>
                     <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Workout Duration</div>
@@ -191,9 +184,7 @@
             </div>
         </div>
 
-        <!-- Live Telemetry Stats Grid -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <!-- Max HR -->
             <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
                 <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Max BPM</span>
                 <div class="flex items-baseline space-x-1 my-2">
@@ -205,7 +196,6 @@
                 </div>
             </div>
 
-            <!-- Min HR -->
             <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
                 <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Min BPM</span>
                 <div class="flex items-baseline space-x-1 my-2">
@@ -217,7 +207,6 @@
                 </div>
             </div>
 
-            <!-- Average HR -->
             <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
                 <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Avg BPM</span>
                 <div class="flex items-baseline space-x-1 my-2">
@@ -227,7 +216,6 @@
                 <div class="text-[10px] text-slate-400">Session average</div>
             </div>
 
-            <!-- Energy / Calories Expended -->
             <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
                 <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Energy Expended</span>
                 <div class="flex items-baseline space-x-1 my-2">
@@ -238,7 +226,6 @@
             </div>
         </div>
 
-        <!-- Live Chart Card -->
         <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 shadow-xl">
             <div class="flex items-center justify-between mb-3">
                 <div class="flex items-center space-x-2">
@@ -252,7 +239,6 @@
             </div>
         </div>
 
-        <!-- Workout History & Saved Sessions Card -->
         <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 shadow-xl space-y-3">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-2">
@@ -270,7 +256,6 @@
                 </div>
             </div>
 
-            <!-- Workout List Container -->
             <div id="workout-history-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
                 <div class="text-center py-6 text-xs text-slate-500 italic">
                     No saved workout sessions yet. Click "Save Session" after your workout to store it here.
@@ -278,15 +263,14 @@
             </div>
         </div>
 
-        <!-- Quick Garmin Tutorial Teaser Card -->
         <div class="bg-gradient-to-r from-slate-800 to-slate-850 border border-slate-700/60 rounded-2xl p-4 flex items-center justify-between">
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 flex-shrink-0">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
                 </div>
                 <div>
-                    <h3 class="text-sm font-semibold text-slate-200">How to broadcast from Garmin FR55?</h3>
-                    <p class="text-xs text-slate-400">Step-by-step pairing and watch settings guide</p>
+                    <h3 class="text-sm font-semibold text-slate-200">How to pair on Windows PC / Mac?</h3>
+                    <p class="text-xs text-slate-400">Step-by-step Bluetooth pairing instructions</p>
                 </div>
             </div>
             <button onclick="toggleTutorialModal(true)" class="px-3.5 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-xs font-semibold transition-colors flex-shrink-0">
@@ -296,82 +280,65 @@
 
     </main>
 
-    <!-- Footer -->
     <footer class="text-center py-4 border-t border-slate-800 text-xs text-slate-500">
         Garmin Forerunner 55 Web Bluetooth HR Monitor &bull; Standard BLE 0x180D
     </footer>
 
-    <!-- Tutorial Modal -->
     <div id="tutorial-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 p-4">
         <div id="tutorial-card" class="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300 flex flex-col max-h-[85vh]">
             
-            <!-- Modal Header -->
             <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-850">
                 <div class="flex items-center space-x-2">
                     <div class="w-7 h-7 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
                     </div>
-                    <h2 class="font-bold text-base text-slate-100">Garmin FR55 HR Broadcast Guide</h2>
+                    <h2 class="font-bold text-base text-slate-100">PC & Garmin FR55 Connection Setup</h2>
                 </div>
                 <button onclick="toggleTutorialModal(false)" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
 
-            <!-- Modal Content (Scrollable) -->
             <div class="p-6 overflow-y-auto space-y-6 text-sm text-slate-300">
                 
-                <!-- Intro -->
                 <div class="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4 text-xs text-orange-200 leading-relaxed">
-                    The Garmin Forerunner 55 supports broadcasting your live heart rate over Bluetooth Low Energy (BLE) to compatible web browsers and apps. Choose one of the two methods below to start broadcasting.
+                    To connect your Garmin FR55 on your PC, make sure your computer has Bluetooth turned on and that you are opening this page using <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>.
                 </div>
 
-                <!-- Method 1 -->
                 <div class="space-y-2">
                     <div class="flex items-center space-x-2 text-rose-400 font-semibold text-sm">
                         <span class="w-6 h-6 rounded-full bg-rose-500/20 flex items-center justify-center text-xs">1</span>
-                        <h3>Method A: Broadcast from Heart Rate Widget</h3>
+                        <h3>Enable Broadcast on Garmin Watch</h3>
                     </div>
                     <ol class="list-decimal list-inside space-y-1.5 pl-2 text-xs text-slate-300 leading-relaxed">
-                        <li>On your Garmin FR55 watch face, press the <strong class="text-slate-100">UP</strong> or <strong class="text-slate-100">DOWN</strong> button until you see the <strong class="text-slate-100">Heart Rate</strong> widget.</li>
-                        <li>Press the <strong class="text-slate-100">START/STOP</strong> (Right-Top) button to open the widget menu.</li>
-                        <li>Scroll down and select <strong class="text-slate-100">Broadcast Heart Rate</strong>.</li>
-                        <li>Press <strong class="text-slate-100">START/STOP</strong> to begin broadcasting. The watch will now transmit your HR over Bluetooth.</li>
-                        <li>Return to this web app and click <strong class="text-slate-100">Connect Garmin FR55</strong>.</li>
+                        <li>Press <strong class="text-slate-100">UP</strong> or <strong class="text-slate-100">DOWN</strong> on your watch face to open the <strong class="text-slate-100">Heart Rate Widget</strong>.</li>
+                        <li>Press <strong class="text-slate-100">START/STOP</strong> to open options.</li>
+                        <li>Select <strong class="text-slate-100">Broadcast Heart Rate</strong> and press <strong class="text-slate-100">START</strong>.</li>
                     </ol>
                 </div>
 
-                <!-- Method 2 -->
                 <div class="space-y-2 pt-2 border-t border-slate-800">
                     <div class="flex items-center space-x-2 text-orange-400 font-semibold text-sm">
                         <span class="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center text-xs">2</span>
-                        <h3>Method B: Broadcast Automatically During an Activity</h3>
+                        <h3>Connect on PC Browser</h3>
                     </div>
                     <ol class="list-decimal list-inside space-y-1.5 pl-2 text-xs text-slate-300 leading-relaxed">
-                        <li>Press the <strong class="text-slate-100">START/STOP</strong> button on your FR55 and select your activity profile (e.g., <strong class="text-slate-100">Run</strong>).</li>
-                        <li>Press and hold <strong class="text-slate-100">UP</strong> to open the activity settings menu.</li>
-                        <li>Scroll down and select <strong class="text-slate-100">Heart Rate</strong> settings.</li>
-                        <li>Select <strong class="text-slate-100">Broadcast During Activity</strong> and toggle it to <strong class="text-slate-100">On</strong>.</li>
-                        <li>Start your workout activity. The watch will automatically broadcast your heart rate to nearby paired devices.</li>
+                        <li>Click <strong class="text-slate-100">Connect Garmin FR55</strong> on this page.</li>
+                        <li>Select your <strong class="text-slate-100">Garmin Device</strong> or <strong class="text-slate-100">Heart Rate Monitor</strong> from the Chrome popup list.</li>
+                        <li>Click <strong class="text-slate-100">Pair</strong>.</li>
                     </ol>
                 </div>
 
-                <!-- Troubleshooting -->
                 <div class="space-y-2 pt-2 border-t border-slate-800">
                     <div class="flex items-center space-x-2 text-cyan-400 font-semibold text-sm">
                         <span class="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center text-xs">3</span>
-                        <h3>Troubleshooting & Tips</h3>
+                        <h3>No Bluetooth on PC?</h3>
                     </div>
-                    <ul class="list-disc list-inside space-y-1.5 pl-2 text-xs text-slate-300 leading-relaxed">
-                        <li><strong class="text-slate-100">Browser Requirement:</strong> Web Bluetooth requires <strong class="text-slate-100">Google Chrome</strong> or Edge on Android, Windows, or Mac. Apple iOS (iPhone/iPad) does not support Web Bluetooth in Safari.</li>
-                        <li><strong class="text-slate-100">Snug Fit:</strong> Ensure your watch is worn snugly on your wrist slightly above your wrist bone for accurate optical HR sensor readings.</li>
-                        <li><strong class="text-slate-100">Proximity:</strong> Keep your phone close to your wrist during connection pairing.</li>
-                    </ul>
+                    <p class="text-xs text-slate-300">If your PC doesn't have Bluetooth, click <strong>"Simulate HR"</strong> to test all heart rate tracking features live!</p>
                 </div>
 
             </div>
 
-            <!-- Modal Footer -->
             <div class="px-6 py-4 border-t border-slate-800 bg-slate-850 flex justify-end">
                 <button onclick="toggleTutorialModal(false)" class="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold rounded-xl transition-colors">
                     Got it, let's connect
@@ -381,16 +348,13 @@
         </div>
     </div>
 
-    <!-- JavaScript App Logic -->
     <script>
-        // Global State
         let bluetoothDevice = null;
         let heartRateCharacteristic = null;
         let isConnected = false;
         let isSimulating = false;
         let simulationInterval = null;
 
-        // Telemetry stats
         let currentBpm = 0;
         let maxBpm = 0;
         let minBpm = 0;
@@ -399,19 +363,15 @@
         let energyExpended = 0;
         let lastRrInterval = null;
 
-        // Chart Data Array (last 60 data points)
         const maxChartPoints = 60;
         let hrChartData = new Array(maxChartPoints).fill(0);
 
-        // Timer state
         let timerSeconds = 0;
         let timerInterval = null;
         let isTimerRunning = false;
 
-        // Workout History state
         let savedWorkouts = [];
 
-        // DOM Elements
         const connectBtn = document.getElementById('connect-btn');
         const connectBtnText = document.getElementById('connect-btn-text');
         const connDot = document.getElementById('conn-dot');
@@ -434,17 +394,17 @@
         const bleWarning = document.getElementById('ble-warning');
         const heartContainer = document.getElementById('heart-container');
 
-        // Check Web Bluetooth Support on load
         window.addEventListener('DOMContentLoaded', () => {
             if (!navigator.bluetooth) {
                 bleWarning.classList.remove('hidden');
+            } else {
+                bleWarning.classList.remove('hidden'); // Show info on PC
             }
             initCanvas();
             window.addEventListener('resize', initCanvas);
             loadWorkoutHistory();
         });
 
-        // Toast Notification Function
         function showToast(message, icon = 'ℹ️') {
             const toast = document.getElementById('toast');
             const toastMsg = document.getElementById('toast-message');
@@ -462,7 +422,6 @@
             }, 3500);
         }
 
-        // Modal Controls
         function toggleTutorialModal(show) {
             const modal = document.getElementById('tutorial-modal');
             const card = document.getElementById('tutorial-card');
@@ -479,7 +438,6 @@
             }
         }
 
-        // Connect / Disconnect Bluetooth
         async function toggleConnection() {
             if (isSimulating) {
                 toggleSimulation();
@@ -491,7 +449,7 @@
             }
 
             if (!navigator.bluetooth) {
-                showToast("Web Bluetooth is not supported on this browser.", "⚠️");
+                showToast("Web Bluetooth is not supported in this browser. Try Chrome/Edge on PC.", "⚠️");
                 return;
             }
 
@@ -499,7 +457,6 @@
                 connText.textContent = "Connecting...";
                 connDot.className = "w-2 h-2 rounded-full bg-amber-500 animate-pulse";
 
-                // Request Bluetooth Device with Heart Rate Service
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     filters: [{ services: ['heart_rate'] }]
                 });
@@ -526,7 +483,7 @@
                 console.error("Bluetooth connection failed:", error);
                 connText.textContent = "Disconnected";
                 connDot.className = "w-2 h-2 rounded-full bg-amber-500";
-                showToast("Connection cancelled or failed.", "❌");
+                showToast("Connection cancelled or Bluetooth not available.", "❌");
             }
         }
 
@@ -550,12 +507,10 @@
             showToast("Device disconnected.", "🔌");
         }
 
-        // Parse BLE Heart Rate Measurement (Characteristic 0x2A37)
         function handleHeartRateData(event) {
             const value = event.target.value;
             const flags = value.getUint8(0);
             
-            // Bit 0: HR Format (0 = UINT8, 1 = UINT16)
             const is16Bit = (flags & 0x01) !== 0;
             let hrValue = 0;
             let index = 1;
@@ -568,13 +523,11 @@
                 index += 1;
             }
 
-            // Bit 1 & 2: Sensor Contact Status
             const contactBit = (flags >> 1) & 0x03;
             let contactStatus = "Waiting";
             if (contactBit === 2) contactStatus = "Not Detected";
             else if (contactBit === 3) contactStatus = "Detected";
 
-            // Bit 3: Energy Expended Status
             let energy = null;
             const energyPresent = (flags & 0x08) !== 0;
             if (energyPresent) {
@@ -582,12 +535,10 @@
                 index += 2;
             }
 
-            // Bit 4: RR-Intervals Present
             let rrIntervals = [];
             const rrPresent = (flags & 0x10) !== 0;
             if (rrPresent) {
                 while (index + 1 <= value.byteLength) {
-                    // RR-Interval units are 1/1024 seconds. Convert to milliseconds.
                     const rrRaw = value.getUint16(index, true);
                     const rrMs = Math.round((rrRaw / 1024) * 1000);
                     rrIntervals.push(rrMs);
@@ -598,15 +549,12 @@
             updateTelemetry(hrValue, contactStatus, energy, rrIntervals.length > 0 ? rrIntervals[rrIntervals.length - 1] : null);
         }
 
-        // Update UI with new telemetry readings
         function updateTelemetry(bpm, contact = null, energy = null, rr = null) {
             currentBpm = bpm;
             bpmDisplay.textContent = bpm;
 
-            // Pulse animation scale adjustment based on BPM speed
             pulseHeart(bpm);
 
-            // Update stats
             if (minBpm === 0 || bpm < minBpm) minBpm = bpm;
             if (bpm > maxBpm) maxBpm = bpm;
 
@@ -631,7 +579,6 @@
                 rrIntervalInfo.textContent = `RR: ${lastRrInterval} ms`;
             }
 
-            // Sensor contact badge update
             if (contact !== null) {
                 contactText.textContent = `Sensor: ${contact}`;
                 if (contact === 'Detected') {
@@ -645,19 +592,16 @@
                 }
             }
 
-            // Push to Chart data
             hrChartData.shift();
             hrChartData.push(bpm);
             drawChart();
         }
 
         function pulseHeart(bpm) {
-            // Adjust heart rate animation duration based on current BPM
             const duration = 60 / Math.max(40, Math.min(200, bpm));
             heartContainer.style.animationDuration = `${duration}s`;
         }
 
-        // Simulation Mode for Testing without Device
         function toggleSimulation() {
             if (isConnected) {
                 disconnectDevice();
@@ -676,7 +620,6 @@
                 updateTelemetry(simBpm, 'Detected', calories, 620);
 
                 simulationInterval = setInterval(() => {
-                    // Random walk in HR
                     const delta = Math.floor(Math.random() * 5) - 2;
                     simBpm = Math.max(90, Math.min(175, simBpm + delta));
                     calories += 1;
@@ -694,7 +637,6 @@
             }
         }
 
-        // Reset Stats
         function clearData() {
             currentBpm = 0;
             maxBpm = 0;
@@ -717,7 +659,6 @@
             showToast("Session telemetry reset.", "🔄");
         }
 
-        // Save Current Workout Session
         function saveCurrentWorkout() {
             if (countBpm === 0 && timerSeconds === 0) {
                 showToast("No workout data recorded yet to save.", "⚠️");
@@ -838,7 +779,6 @@
             showToast("Workouts exported as CSV!", "📥");
         }
 
-        // Workout Timer Logic
         function toggleTimer() {
             isTimerRunning = !isTimerRunning;
             if (isTimerRunning) {
@@ -871,7 +811,6 @@
             timerDisplay.textContent = `${hrs}:${mins}:${secs}`;
         }
 
-        // Canvas Sparkline Chart
         const canvas = document.getElementById('hr-canvas');
         const ctx = canvas.getContext('2d');
 
@@ -891,7 +830,6 @@
 
             ctx.clearRect(0, 0, width, height);
 
-            // Draw subtle background grid lines
             ctx.strokeStyle = '#1e293b';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -906,12 +844,10 @@
 
             const stepX = width / (maxChartPoints - 1);
 
-            // Build gradient for chart line fill
             const gradient = ctx.createLinearGradient(0, 0, 0, height);
             gradient.addColorStop(0, 'rgba(255, 51, 102, 0.3)');
             gradient.addColorStop(1, 'rgba(255, 51, 102, 0.0)');
 
-            // Draw Area Fill
             ctx.beginPath();
             ctx.moveTo(0, height);
             for (let i = 0; i < hrChartData.length; i++) {
@@ -926,7 +862,6 @@
             ctx.fillStyle = gradient;
             ctx.fill();
 
-            // Draw Line
             ctx.beginPath();
             let started = false;
             for (let i = 0; i < hrChartData.length; i++) {
