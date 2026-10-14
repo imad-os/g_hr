@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="40%" r="60%" fx="30%" fy="30%">
+      <stop offset="0%" stop-color="#182338"/>
+      <stop offset="60%" stop-color="#0a0e17"/>
+      <stop offset="100%" stop-color="#05070a"/>
+    </radialGradient>
+
+    <!-- Glowing Heart Gradient -->
+    <linearGradient id="heartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff3366"/>
+      <stop offset="50%" stop-color="#ff0055"/>
+      <stop offset="100%" stop-color="#990033"/>
+    </linearGradient>
+
+    <!-- Bluetooth / Tech Accent Gradient -->
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="100%" stop-color="#4facfe"/>
+    </linearGradient>
+
+    <!-- ECG Pulse Line Gradient -->
+    <linearGradient id="ecgGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00f2fe" stop-opacity="0"/>
+      <stop offset="15%" stop-color="#00f2fe"/>
+      <stop offset="50%" stop-color="#ffffff"/>
+      <stop offset="85%" stop-color="#00f2fe"/>
+      <stop offset="100%" stop-color="#00f2fe" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- High Intensity Glow Filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Soft Heart Glow -->
+    <filter id="heartGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="20" result="blur" />
+      <feComponentTransfer in="blur" result="boost">
+        <feFuncA type="linear" slope="0.6"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="boost" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Glassmorphism Reflection -->
+    <linearGradient id="glassGloss" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.15"/>
+      <stop offset="40%" stop-color="#ffffff" stop-opacity="0.02"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- App Icon Base Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+
+  <!-- Outer Tech Ring (Smartwatch Bezel Concept) -->
+  <circle cx="256" cy="256" r="216" fill="none" stroke="#1e293b" stroke-width="8" />
+  <circle cx="256" cy="256" r="216" fill="none" stroke="url(#cyanGrad)" stroke-width="8" stroke-dasharray="25 15 80 15 40 15" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Outer Ambient Heart Glow -->
+  <path d="M256 390 L241.5 376.8 C190 330.1 156 299.3 156 261 C156 229.7 180.7 205 212 205 C229.6 205 246.6 213.2 256 226.1 C265.4 213.2 282.4 205 300 205 C331.3 205 356 229.7 356 261 C356 299.3 322 330.1 270.5 376.9 L256 390 Z" 
+        fill="#ff0055" 
+        filter="url(#heartGlow)" 
+        opacity="0.5" />
+
+  <!-- Wireless Broadcast Waves (Radar/Bluetooth Signal) -->
+  <!-- Inner Wave -->
+  <path d="M 186 160 A 110 110 0 0 1 326 160" fill="none" stroke="url(#cyanGrad)" stroke-width="6" stroke-linecap="round" opacity="0.9" filter="url(#glow)"/>
+  <!-- Middle Wave -->
+  <path d="M 156 125 A 150 150 0 0 1 356 125" fill="none" stroke="url(#cyanGrad)" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+  <!-- Outer Wave -->
+  <path d="M 126 90 A 190 190 0 0 1 386 90" fill="none" stroke="url(#cyanGrad)" stroke-width="4" stroke-linecap="round" opacity="0.3"/>
+
+  <!-- Main Pulsing Heart Body -->
+  <path d="M 256 415 
+           C 240 401 136 306 136 228 
+           C 136 178 174 140 222 140 
+           C 249 140 274 153 290 174 
+           C 306 153 331 140 358 140 
+           C 406 140 444 178 444 228 
+           C 444 306 340 401 324 415 
+           L 290 445 
+           Z" 
+        fill="url(#heartGrad)" 
+        transform="scale(0.82) translate(56, 42)"
+        filter="url(#glow)"/>
+
+  <!-- Internal ECG Telemetry Line -->
+  <path d="M 110 260 
+           L 180 260 
+           L 198 225 
+           L 218 295 
+           L 242 175 
+           L 268 330 
+           L 290 240 
+           L 308 270 
+           L 326 260 
+           L 402 260" 
+        fill="none" 
+        stroke="url(#ecgGrad)" 
+        stroke-width="7" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"
+        filter="url(#glow)"/>
+
+  <!-- Bluetooth Icon Overlay Badge (Top Right Tech Emblem) -->
+  <g transform="translate(325, 80)">
+    <!-- Badge Background -->
+    <circle cx="40" cy="40" r="34" fill="#0a0e17" stroke="url(#cyanGrad)" stroke-width="3" filter="url(#glow)"/>
+    <!-- Bluetooth Symbol -->
+    <path d="M 37 20 
+             L 45 28 
+             L 33 38 
+             L 45 48 
+             L 37 56 
+             L 37 20 
+             M 37 32 
+             L 41 28 
+             M 37 44 
+             L 41 48" 
+          fill="none" 
+          stroke="#00f2fe" 
+          stroke-width="3.5" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"/>
+  </g>
+
+  <!-- Live Status LED Indicator Dot -->
+  <circle cx="145" cy="115" r="7" fill="#00f2fe" filter="url(#glow)"/>
+
+  <!-- Glassmorphism Top Gloss / Curved Highlight -->
+  <rect width="512" height="512" rx="112" fill="url(#glassGloss)"/>
+  
+  <!-- Subtle Border Stroke -->
+  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="#ffffff" stroke-opacity="0.1" stroke-width="2"/>
+</svg>
