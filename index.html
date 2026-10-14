@@ -563,7 +563,7 @@ if (document.readyState === 'loading') {
             connectBtn.classList.remove('from-slate-700', 'to-slate-800');
         }
         async function toggleConnection() {
-            if (isSimulating) toggleSimulation();
+            if (isSimulating) await toggleSimulation();
             if (isMyPcBluetoothMode() && hostBleConnecting) { disconnectDevice(); return; }
             if (isConnected) { disconnectDevice(); return; }
 
@@ -729,41 +729,79 @@ if (document.readyState === 'loading') {
             heartContainer.style.animationDuration = `${duration}s`;
         }
 
-        function toggleSimulation() {
-            if (isConnected) {
-                disconnectDevice();
-            }
-
-            isSimulating = !isSimulating;
-            if (isSimulating) {
-                simBtn.textContent = "Stop Simulation";
-                simBtn.className = "flex-1 sm:flex-none px-4 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-medium text-xs transition-colors shadow-lg shadow-rose-600/30";
-                connText.textContent = "Simulating FR55";
-                connDot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
-                showToast("Started HR simulation mode.", "🧪");
-
-                let simBpm = 115;
-                let calories = 45;
-                updateTelemetry(simBpm, 'Detected', calories, 620);
-
-                simulationInterval = setInterval(() => {
-                    const delta = Math.floor(Math.random() * 5) - 2;
-                    simBpm = Math.max(90, Math.min(175, simBpm + delta));
-                    calories += 1;
-                    const rrSim = Math.round(60000 / simBpm + (Math.random() * 40 - 20));
-                    updateTelemetry(simBpm, 'Detected', calories, rrSim);
-                }, 1000);
-
-            } else {
-                clearInterval(simulationInterval);
-                simBtn.textContent = "Simulate HR";
-                simBtn.className = "flex-1 sm:flex-none px-4 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 rounded-xl font-medium text-xs transition-colors";
-                connText.textContent = "Disconnected";
-                connDot.className = "w-2 h-2 rounded-full bg-amber-500";
-                showToast("Stopped HR simulation.", "🛑");
-            }
+        /* HR BLE test mode v1: on My PC, simulation originates in the host bridge. */
+        function setSimulationButtonState(active) {
+            var hostedMode = isMyPcBluetoothMode();
+            simBtn.textContent = active
+                ? (hostedMode ? 'Stop Test Data' : 'Stop Simulation')
+                : (hostedMode ? 'Start Test Data' : 'Simulate HR');
+            simBtn.className = active
+                ? 'flex-1 sm:flex-none px-4 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-medium text-xs transition-colors shadow-lg shadow-rose-600/30'
+                : 'flex-1 sm:flex-none px-4 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 rounded-xl font-medium text-xs transition-colors';
         }
 
+        async function toggleSimulation() {
+            if (isMyPcBluetoothMode()) {
+                if (isSimulating) {
+                    try {
+                        await MyPC.bluetooth.stopTest();
+                    } catch (error) {
+                        console.error('Could not stop My PC test data:', error);
+                        showToast(error && error.message ? error.message : 'Could not stop test data.', '⚠️');
+                    }
+                    isSimulating = false;
+                    clearInterval(simulationInterval);
+                    simulationInterval = null;
+                    setSimulationButtonState(false);
+                    if (!isConnected) setConnectionButtonDisconnected();
+                    showToast('Stopped My PC test data.', '🛑');
+                    return;
+                }
+
+                /* The host cancels any scan and disconnects a real sensor before simulating. */
+                isConnected = false;
+                hostBleConnecting = false;
+                isSimulating = true;
+                setSimulationButtonState(true);
+                connText.textContent = 'Starting test data…';
+                connDot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+                try {
+                    await MyPC.bluetooth.startTest();
+                } catch (error) {
+                    isSimulating = false;
+                    setSimulationButtonState(false);
+                    setConnectionButtonDisconnected();
+                    console.error('Could not start My PC test data:', error);
+                    showToast(error && error.message ? error.message : 'Could not start test data.', '⚠️');
+                }
+                return;
+            }
+
+            /* Standalone browser fallback: retain the original local simulation. */
+            if (isConnected) disconnectDevice();
+            isSimulating = !isSimulating;
+            setSimulationButtonState(isSimulating);
+            if (isSimulating) {
+                connText.textContent = 'Simulating FR55';
+                connDot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+                showToast('Started HR simulation mode.', '🧪');
+                var simBpm = 115;
+                var calories = 45;
+                updateTelemetry(simBpm, 'Detected', calories, 620);
+                simulationInterval = setInterval(function () {
+                    var delta = Math.floor(Math.random() * 5) - 2;
+                    simBpm = Math.max(90, Math.min(175, simBpm + delta));
+                    calories += Math.random() < 0.2 ? 1 : 0;
+                    var rrSim = Math.round(60000 / simBpm + (Math.random() * 40 - 20));
+                    updateTelemetry(simBpm, 'Detected', calories, rrSim);
+                }, 1000);
+            } else {
+                clearInterval(simulationInterval);
+                simulationInterval = null;
+                if (!isConnected) setConnectionButtonDisconnected();
+                showToast('Stopped HR simulation.', '🛑');
+            }
+        }
         function clearData() {
             currentBpm = 0;
             maxBpm = 0;
@@ -1128,6 +1166,7 @@ function handleMyPcInput(action, pressed) {
         function installHostBluetoothHandlers() {
             if (hostBleHandlersInstalled || !isMyPcBluetoothMode()) return;
             hostBleHandlersInstalled = true;
+            setSimulationButtonState(false);
             hostBleUnsubscribers.push(MyPC.bluetooth.on('reading', function (reading) {
                 if (!reading || typeof reading.bpm !== 'number' || reading.bpm <= 0) return;
                 updateTelemetry(reading.bpm,
@@ -1137,7 +1176,19 @@ function handleMyPcInput(action, pressed) {
             }));
             hostBleUnsubscribers.push(MyPC.bluetooth.on('status', function (event) {
                 if (!event || !event.status) return;
-                if (event.status === 'scanning') {
+                if (event.status === 'test') {
+                    hostBleConnecting = false;
+                    isConnected = false;
+                    isSimulating = true;
+                    setSimulationButtonState(true);
+                    connText.textContent = 'My PC Test Data';
+                    connDot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+                    showToast('My PC is sending simulated heart-rate data.', '🧪');
+                } else if (event.status === 'test-stopped') {
+                    isSimulating = false;
+                    setSimulationButtonState(false);
+                    if (!isConnected) setConnectionButtonDisconnected();
+                } else if (event.status === 'scanning') {
                     hostBleConnecting = true;
                     connText.textContent = 'Scanning for heart-rate sensor…';
                     connDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
@@ -1149,13 +1200,19 @@ function handleMyPcInput(action, pressed) {
                     connectBtnText.textContent = 'Connecting…';
                 } else if (event.status === 'connected') {
                     hostBleConnecting = false;
+                    isSimulating = false;
+                    setSimulationButtonState(false);
                     setConnectionButtonConnected(event.deviceName);
                     showToast('Connected to ' + (event.deviceName || 'heart-rate sensor') + '.', '⚡');
                 } else if (event.status === 'disconnected') {
                     hostBleConnecting = false;
+                    isSimulating = false;
+                    setSimulationButtonState(false);
                     onDisconnected();
                 } else if (event.status === 'error') {
                     hostBleConnecting = false;
+                    isSimulating = false;
+                    setSimulationButtonState(false);
                     setConnectionButtonDisconnected();
                     /* toggleConnection() reports the rejection so errors are not toasted twice. */
                 }

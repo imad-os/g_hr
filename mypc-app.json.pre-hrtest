@@ -1,0 +1,11 @@
+{
+  "mypc": 1,
+  "id": "hr-monitor",
+  "name": "HR Monitor",
+  "description": "Live heart-rate telemetry dashboard.",
+  "type": "app",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "version": "1.0.6",
+  "config": {}
+}
