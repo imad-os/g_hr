@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garmin FR55 Real-Time HR Telemetry</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#151e32',
+                            900: '#0f172a',
+                            950: '#090d16',
+                        },
+                        neon: {
+                            red: '#ff3366',
+                            orange: '#ff9933',
+                            cyan: '#00f0ff',
+                            green: '#00ff66'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <script src="https://imad-os.github.io/g/sdk/mypc-sdk.js?v=hr-ble-picker-1"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            touch-action: manipulation;
+        }
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        @keyframes heartbeat {
+            0% { transform: scale(1); }
+            15% { transform: scale(1.25); }
+            30% { transform: scale(1); }
+            45% { transform: scale(1.15); }
+            60% { transform: scale(1); }
+            100% { transform: scale(1); }
+        }
+        .animate-heart {
+            animation: heartbeat 1s infinite ease-in-out;
+        }
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+/* TV-safe viewport and visible focus for the remote control */
+html,
+body {
+    width: 100%;
+    min-height: 100%;
+}
+
+body {
+    overflow-x: hidden;
+}
+
+#dashboard,
+#dashboard > * {
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+#dashboard button {
+    min-height: 44px;
+}
+
+button:focus,
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 3px solid #00f0ff;
+    outline-offset: 4px;
+}
+
+/* Wide landscape displays: TV or desktop monitor */
+@media screen and (min-width: 1100px) and (min-aspect-ratio: 6/5) {
+    #dashboard {
+        max-width: 1680px;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+        gap: 20px;
+        padding: 24px 32px 40px;
+    }
+
+    /* Bluetooth warning and connection controls */
+    #dashboard > #ble-warning,
+    #dashboard > div:nth-of-type(2) {
+        grid-column: 1 / -1;
+    }
+
+    /* Live HR, statistics, chart and session history */
+    #dashboard > div:nth-of-type(3) {
+        grid-column: 1;
+    }
+
+    #dashboard > div:nth-of-type(4) {
+        grid-column: 2;
+    }
+
+    #dashboard > div:nth-of-type(5) {
+        grid-column: 1;
+    }
+
+    #dashboard > div:nth-of-type(6) {
+        grid-column: 2;
+    }
+
+    #dashboard > div:nth-of-type(7) {
+        grid-column: 1 / -1;
+    }
+}
+
+/* Reduce motion for people who prefer it */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-rose-500 selection:text-white">
+
+    <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 transition-all duration-300 opacity-0 pointer-events-none translate-y-[-20px]">
+        <div id="toast-content" class="bg-slate-800 border border-slate-700 text-slate-100 px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 text-sm">
+            <span id="toast-icon">ℹ️</span>
+            <span id="toast-message">Notification message</span>
+        </div>
+    </div>
+
+    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-rose-500 to-orange-500 flex items-center justify-center shadow-lg shadow-rose-500/20">
+                <svg class="w-5 h-5 text-white animate-heart" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="font-bold text-base leading-tight tracking-tight">FR55 Live HR</h1>
+                <p class="text-xs text-slate-400">Garmin BLE Telemetry</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <div id="conn-status-pill" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-medium text-slate-300">
+                <span id="conn-dot" class="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span id="conn-text">Disconnected</span>
+            </div>
+            <button onclick="toggleTutorialModal(true)" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors" title="Garmin PC Setup Tutorial">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main
+    id="dashboard"
+    class="flex-1 w-full max-w-7xl mx-auto p-4 pb-12 grid grid-cols-1 gap-4"
+    >
+
+        <!-- PC Compatibility & Connection Helper Banner -->
+        <div id="ble-warning" class="hidden bg-amber-950/40 border border-amber-800/60 rounded-2xl p-4 text-xs text-amber-200 leading-relaxed">
+            <div class="flex items-start space-x-3">
+                <span class="text-lg">💻</span>
+                <div>
+                    <strong class="font-semibold block mb-1">PC Bluetooth Setup Info</strong>
+                    To connect your Garmin FR55 directly to your PC:
+                    <ul class="list-disc list-inside mt-1 space-y-1 text-[11px] text-amber-300">
+                        <li>Ensure Bluetooth is turned ON in Windows/macOS Settings.</li>
+                        <li>Use <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>.</li>
+                        <li>Enable <strong>"Broadcast Heart Rate"</strong> on your Garmin Watch face.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Connection & Controls Card -->
+        <div class="bg-slate-800/80 backdrop-blur border border-slate-700/60 rounded-2xl p-4 shadow-xl">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <button id="connect-btn" onclick="toggleConnection()" class="w-full sm:w-auto flex-1 bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-rose-600/20 active:scale-95 transition-all flex items-center justify-center space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                    </svg>
+                    <span id="connect-btn-text">Connect Garmin FR55</span>
+                </button>
+                <div class="flex items-center space-x-2 w-full sm:w-auto">
+                    <button id="sim-btn" onclick="toggleSimulation()" class="flex-1 sm:flex-none px-4 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 rounded-xl font-medium text-xs transition-colors">
+                        Simulate HR
+                    </button>
+                    <button onclick="clearData()" class="px-4 py-3 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 text-slate-300 rounded-xl font-medium text-xs transition-colors" title="Reset Session Stats">
+                        Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-b from-slate-800 to-slate-850 border border-slate-700/80 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+            <div class="absolute -top-12 -right-12 w-40 h-40 bg-rose-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-12 -left-12 w-40 h-40 bg-orange-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-2">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
+                    <span class="text-xs font-semibold tracking-wider uppercase text-slate-400">Live Heart Rate</span>
+                </div>
+                <div id="contact-badge" class="px-2.5 py-1 rounded-md bg-slate-900/60 border border-slate-700 text-[10px] font-medium text-slate-400 flex items-center space-x-1.5">
+                    <svg class="w-3 h-3 text-slate-500" id="contact-icon" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    <span id="contact-text">Sensor: Waiting</span>
+                </div>
+            </div>
+
+            <div class="flex items-baseline justify-center my-6 space-x-3">
+                <div id="bpm-display" class="mono-font text-7xl sm:text-8xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-slate-300">
+                    --
+                </div>
+                <div class="text-rose-500 font-bold text-xl sm:text-2xl uppercase tracking-wider">BPM</div>
+            </div>
+
+            <div class="flex justify-center mb-6">
+                <div id="heart-container" class="p-3 bg-rose-500/10 border border-rose-500/20 rounded-full text-rose-500 transition-transform duration-150">
+                    <svg class="w-8 h-8 animate-heart" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="bg-slate-900/60 border border-slate-700/50 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                    <div class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Workout Duration</div>
+                    <div id="timer-display" class="mono-font text-2xl font-bold text-slate-200">00:00:00</div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button id="timer-toggle-btn" onclick="toggleTimer()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-xs shadow-md transition-colors flex items-center space-x-1.5">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span id="timer-btn-text">Start</span>
+                    </button>
+                    <button onclick="resetTimer()" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 text-xs transition-colors" title="Reset Timer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Max BPM</span>
+                <div class="flex items-baseline space-x-1 my-2">
+                    <span id="stat-max" class="mono-font text-2xl font-bold text-rose-400">0</span>
+                    <span class="text-xs text-slate-500">bpm</span>
+                </div>
+                <div class="w-full bg-slate-700/50 rounded-full h-1 overflow-hidden">
+                    <div id="max-bar" class="bg-rose-500 h-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Min BPM</span>
+                <div class="flex items-baseline space-x-1 my-2">
+                    <span id="stat-min" class="mono-font text-2xl font-bold text-cyan-400">0</span>
+                    <span class="text-xs text-slate-500">bpm</span>
+                </div>
+                <div class="w-full bg-slate-700/50 rounded-full h-1 overflow-hidden">
+                    <div id="min-bar" class="bg-cyan-500 h-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Avg BPM</span>
+                <div class="flex items-baseline space-x-1 my-2">
+                    <span id="stat-avg" class="mono-font text-2xl font-bold text-amber-400">0</span>
+                    <span class="text-xs text-slate-500">bpm</span>
+                </div>
+                <div class="text-[10px] text-slate-400">Session average</div>
+            </div>
+
+            <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Energy Expended</span>
+                <div class="flex items-baseline space-x-1 my-2">
+                    <span id="stat-energy" class="mono-font text-2xl font-bold text-orange-400">0</span>
+                    <span class="text-xs text-slate-500">kcal</span>
+                </div>
+                <div class="text-[10px] text-slate-400" id="rr-interval-info">RR: -- ms</div>
+            </div>
+        </div>
+
+        <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 shadow-xl">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-2">
+                    <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path></svg>
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300">Heart Rate Sparkline (Last 60s)</h2>
+                </div>
+                <span id="chart-status" class="text-[10px] text-slate-500 mono-font">Real-time</span>
+            </div>
+            <div class="w-full h-36 bg-slate-900/60 rounded-xl border border-slate-700/40 relative overflow-hidden p-2">
+                <canvas id="hr-canvas" class="w-full h-full"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 shadow-xl space-y-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300">Saved Workout Sessions</h2>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="saveCurrentWorkout()" class="px-3 py-1.5 bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 text-white font-semibold rounded-lg text-xs shadow-md transition-all flex items-center space-x-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                        <span>Save Session</span>
+                    </button>
+                    <button onclick="exportWorkoutsCSV()" class="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs font-medium transition-colors" title="Export CSV">
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <div id="workout-history-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                <div class="text-center py-6 text-xs text-slate-500 italic">
+                    No saved workout sessions yet. Click "Save Session" after your workout to store it here.
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-slate-800 to-slate-850 border border-slate-700/60 rounded-2xl p-4 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 flex-shrink-0">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-200">How to pair on Windows PC / Mac?</h3>
+                    <p class="text-xs text-slate-400">Step-by-step Bluetooth pairing instructions</p>
+                </div>
+            </div>
+            <button onclick="toggleTutorialModal(true)" class="px-3.5 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-xs font-semibold transition-colors flex-shrink-0">
+                View Guide
+            </button>
+        </div>
+
+    </main>
+
+    <footer class="text-center py-4 border-t border-slate-800 text-xs text-slate-500">
+        Garmin Forerunner 55 Web Bluetooth HR Monitor &bull; Standard BLE 0x180D
+    </footer>
+
+    <!-- HR BLE device picker v1: selection UI for Samsung TV / My PC. -->
+    <div id="hr-device-picker" class="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-200 p-4">
+        <div id="hr-device-picker-card" class="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+            <div class="px-6 py-5 border-b border-slate-800 flex items-center justify-between gap-4">
+                <div>
+                    <h2 class="font-bold text-xl text-white">Choose heart-rate sensor</h2>
+                    <p class="text-sm text-slate-400 mt-1">Select a watch or BLE heart-rate monitor using your TV remote.</p>
+                </div>
+                <span class="text-2xl" aria-hidden="true">⌚</span>
+            </div>
+            <div class="px-6 pt-4">
+                <p id="hr-device-picker-status" class="text-sm text-cyan-300" aria-live="polite">Ready to scan.</p>
+            </div>
+            <div id="hr-device-list" class="px-6 py-4 overflow-y-auto flex-1 min-h-[160px] space-y-3">
+                <div class="text-slate-400 text-sm py-8 text-center">Press Scan to find nearby heart-rate sensors.</div>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-800 flex flex-wrap justify-end gap-3">
+                <button id="hr-device-picker-rescan" type="button" onclick="scanHeartRateDevices()" class="px-5 py-3 bg-cyan-700 hover:bg-cyan-600 text-white rounded-xl font-semibold">Scan again</button>
+                <button id="hr-device-picker-cancel" type="button" onclick="closeHrDevicePicker(true)" class="px-5 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold">Cancel</button>
+            </div>
+        </div>
+    </div>
+    <div id="tutorial-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300 p-4">
+        <div id="tutorial-card" class="bg-slate-900 border border-slate-700 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300 flex flex-col max-h-[85vh]">
+            
+            <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-850">
+                <div class="flex items-center space-x-2">
+                    <div class="w-7 h-7 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                    </div>
+                    <h2 class="font-bold text-base text-slate-100">PC & Garmin FR55 Connection Setup</h2>
+                </div>
+                <button onclick="toggleTutorialModal(false)" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-6 text-sm text-slate-300">
+                
+                <div class="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4 text-xs text-orange-200 leading-relaxed">
+                    To connect your Garmin FR55 on your PC, make sure your computer has Bluetooth turned on and that you are opening this page using <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>.
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex items-center space-x-2 text-rose-400 font-semibold text-sm">
+                        <span class="w-6 h-6 rounded-full bg-rose-500/20 flex items-center justify-center text-xs">1</span>
+                        <h3>Enable Broadcast on Garmin Watch</h3>
+                    </div>
+                    <ol class="list-decimal list-inside space-y-1.5 pl-2 text-xs text-slate-300 leading-relaxed">
+                        <li>Press <strong class="text-slate-100">UP</strong> or <strong class="text-slate-100">DOWN</strong> on your watch face to open the <strong class="text-slate-100">Heart Rate Widget</strong>.</li>
+                        <li>Press <strong class="text-slate-100">START/STOP</strong> to open options.</li>
+                        <li>Select <strong class="text-slate-100">Broadcast Heart Rate</strong> and press <strong class="text-slate-100">START</strong>.</li>
+                    </ol>
+                </div>
+
+                <div class="space-y-2 pt-2 border-t border-slate-800">
+                    <div class="flex items-center space-x-2 text-orange-400 font-semibold text-sm">
+                        <span class="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center text-xs">2</span>
+                        <h3>Connect on PC Browser</h3>
+                    </div>
+                    <ol class="list-decimal list-inside space-y-1.5 pl-2 text-xs text-slate-300 leading-relaxed">
+                        <li>Click <strong class="text-slate-100">Connect Garmin FR55</strong> on this page.</li>
+                        <li>Select your <strong class="text-slate-100">Garmin Device</strong> or <strong class="text-slate-100">Heart Rate Monitor</strong> from the Chrome popup list.</li>
+                        <li>Click <strong class="text-slate-100">Pair</strong>.</li>
+                    </ol>
+                </div>
+
+                <div class="space-y-2 pt-2 border-t border-slate-800">
+                    <div class="flex items-center space-x-2 text-cyan-400 font-semibold text-sm">
+                        <span class="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center text-xs">3</span>
+                        <h3>No Bluetooth on PC?</h3>
+                    </div>
+                    <p class="text-xs text-slate-300">If your PC doesn't have Bluetooth, click <strong>"Simulate HR"</strong> to test all heart rate tracking features live!</p>
+                </div>
+
+            </div>
+
+            <div class="px-6 py-4 border-t border-slate-800 bg-slate-850 flex justify-end">
+                <button onclick="toggleTutorialModal(false)" class="px-5 py-2.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold rounded-xl transition-colors">
+                    Got it, let's connect
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let bluetoothDevice = null;
+        let heartRateCharacteristic = null;
+        let isConnected = false;
+        let isSimulating = false;
+        let simulationInterval = null;
+
+        let currentBpm = 0;
+        let maxBpm = 0;
+        let minBpm = 0;
+        let sumBpm = 0;
+        let countBpm = 0;
+        let energyExpended = 0;
+        let lastRrInterval = null;
+
+        const maxChartPoints = 60;
+        let hrChartData = new Array(maxChartPoints).fill(0);
+
+        let timerSeconds = 0;
+        let timerInterval = null;
+        let isTimerRunning = false;
+
+        let savedWorkouts = [];
+
+        const connectBtn = document.getElementById('connect-btn');
+        const connectBtnText = document.getElementById('connect-btn-text');
+        const connDot = document.getElementById('conn-dot');
+        const connText = document.getElementById('conn-text');
+        const bpmDisplay = document.getElementById('bpm-display');
+        const statMax = document.getElementById('stat-max');
+        const statMin = document.getElementById('stat-min');
+        const statAvg = document.getElementById('stat-avg');
+        const statEnergy = document.getElementById('stat-energy');
+        const rrIntervalInfo = document.getElementById('rr-interval-info');
+        const contactBadge = document.getElementById('contact-badge');
+        const contactText = document.getElementById('contact-text');
+        const contactIcon = document.getElementById('contact-icon');
+        const maxBar = document.getElementById('max-bar');
+        const minBar = document.getElementById('min-bar');
+        const timerDisplay = document.getElementById('timer-display');
+        const timerToggleBtn = document.getElementById('timer-toggle-btn');
+        const timerBtnText = document.getElementById('timer-btn-text');
+        const simBtn = document.getElementById('sim-btn');
+        const bleWarning = document.getElementById('ble-warning');
+        const heartContainer = document.getElementById('heart-container');
+
+
+        let hrUiInitialized = false;
+
+function initializeHrUi() {
+    // Prevent initialization from running twice.
+    if (hrUiInitialized) return;
+    hrUiInitialized = true;
+
+    // The desktop guide is irrelevant when My PC supplies native TV Bluetooth.
+    if (isMyPcBluetoothMode()) bleWarning.classList.add('hidden');
+    else bleWarning.classList.remove('hidden');
+
+    // Initialize dashboard.
+    initCanvas();
+    window.addEventListener('resize', initCanvas);
+    loadWorkoutHistory();
+}
+
+// Ensure the DOM exists before initialization.
+if (document.readyState === 'loading') {
+    document.addEventListener(
+        'DOMContentLoaded',
+        initializeHrUi,
+        { once: true }
+    );
+} else {
+    initializeHrUi();
+}
+
+
+
+        function showToast(message, icon = 'ℹ️') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            const toastIcon = document.getElementById('toast-icon');
+            
+            toastMsg.textContent = message;
+            toastIcon.textContent = icon;
+            
+            toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-[-20px]');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-[-20px]');
+            }, 3500);
+        }
+
+        function toggleTutorialModal(show) {
+            const modal = document.getElementById('tutorial-modal');
+            const card = document.getElementById('tutorial-card');
+            if (show) {
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                modal.classList.add('opacity-100');
+                card.classList.remove('scale-95');
+                card.classList.add('scale-100');
+            } else {
+                modal.classList.remove('opacity-100');
+                modal.classList.add('opacity-0', 'pointer-events-none');
+                card.classList.remove('scale-100');
+                card.classList.add('scale-95');
+            }
+        }
+
+        /* HR BLE bridge v1: use native host BLE in My PC and Web Bluetooth elsewhere. */
+        var hostBleConnecting = false;
+        /* HR BLE device picker v1: user selects a discovered sensor; never auto-connect to the first result. */
+        var hrDevicePickerOpen = false;
+        var hrDiscoveredDevices = Object.create(null);
+        var hrDeviceOrder = [];
+        var hrScanGeneration = 0;
+        var hrScanInFlight = false;
+
+        function showHrDevicePicker(show) {
+            var modal = document.getElementById('hr-device-picker');
+            if (!modal) return;
+            if (show) {
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                modal.classList.add('opacity-100');
+            } else {
+                modal.classList.remove('opacity-100');
+                modal.classList.add('opacity-0', 'pointer-events-none');
+            }
+            hrDevicePickerOpen = !!show;
+        }
+        function renderHrDeviceList(emptyMessage) {
+            var list = document.getElementById('hr-device-list');
+            if (!list) return;
+            list.innerHTML = '';
+            if (!hrDeviceOrder.length) {
+                var empty = document.createElement('div');
+                empty.className = 'text-slate-400 text-sm py-8 text-center';
+                empty.textContent = emptyMessage || 'Searching for heart-rate sensors…';
+                list.appendChild(empty);
+                return;
+            }
+            hrDeviceOrder.forEach(function (id) {
+                var item = hrDiscoveredDevices[id];
+                if (!item) return;
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'w-full text-left flex items-center gap-4 p-4 rounded-2xl border border-slate-700 bg-slate-800 hover:bg-slate-700 focus:bg-slate-700 transition-colors';
+                button.setAttribute('data-device-id', item.id);
+                var icon = document.createElement('span');
+                icon.className = 'flex-shrink-0 w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-2xl';
+                icon.textContent = '⌚';
+                var body = document.createElement('span');
+                body.className = 'flex-1 min-w-0';
+                var name = document.createElement('span');
+                name.className = 'block text-base font-semibold text-white break-words';
+                name.textContent = item.name || 'Unnamed heart-rate sensor';
+                var address = document.createElement('span');
+                address.className = 'block text-xs text-slate-400 mt-1 break-all';
+                address.textContent = item.address ? 'Bluetooth address: ' + item.address : 'Heart-rate service candidate';
+                var action = document.createElement('span');
+                action.className = 'flex-shrink-0 text-cyan-300 font-semibold';
+                action.textContent = 'Connect  ›';
+                body.appendChild(name);
+                body.appendChild(address);
+                button.appendChild(icon);
+                button.appendChild(body);
+                button.appendChild(action);
+                button.addEventListener('click', function () { connectToHrDevice(item.id); });
+                list.appendChild(button);
+            });
+        }
+        function handleHrHostDeviceFound(event) {
+            var item = event && (event.device || event);
+            if (!item || !item.id) return;
+            if (!hrDiscoveredDevices[item.id]) hrDeviceOrder.push(item.id);
+            hrDiscoveredDevices[item.id] = item;
+            if (hrDevicePickerOpen) renderHrDeviceList();
+        }
+        function openHrDevicePicker() {
+            if (!isMyPcBluetoothMode()) return;
+            hrDiscoveredDevices = Object.create(null);
+            hrDeviceOrder = [];
+            showHrDevicePicker(true);
+            var status = document.getElementById('hr-device-picker-status');
+            if (status) status.textContent = 'Scanning for nearby heart-rate sensors…';
+            renderHrDeviceList('Scanning… keep your watch awake and enable Broadcast Heart Rate.');
+            hostBleConnecting = true;
+            connText.textContent = 'Scanning for sensors…';
+            connDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+            connectBtnText.textContent = 'Searching…';
+            var rescan = document.getElementById('hr-device-picker-rescan');
+            if (rescan) rescan.focus();
+            scanHeartRateDevices();
+        }
+        async function scanHeartRateDevices() {
+            if (!isMyPcBluetoothMode() || !hrDevicePickerOpen) return;
+            var generation = ++hrScanGeneration;
+            if (hrScanInFlight) {
+                try { await MyPC.bluetooth.cancelScan(); } catch (e) {}
+            }
+            if (generation !== hrScanGeneration || !hrDevicePickerOpen) return;
+            hrDiscoveredDevices = Object.create(null);
+            hrDeviceOrder = [];
+            hrScanInFlight = true;
+            var status = document.getElementById('hr-device-picker-status');
+            if (status) status.textContent = 'Scanning for 10 seconds… select a sensor when it appears.';
+            renderHrDeviceList('Scanning… keep your watch awake and enable Broadcast Heart Rate.');
+            try {
+                var result = await MyPC.bluetooth.scan();
+                if (generation !== hrScanGeneration || !hrDevicePickerOpen) return;
+                var devices = result && result.devices ? result.devices : [];
+                devices.forEach(handleHrHostDeviceFound);
+                if (status) status.textContent = hrDeviceOrder.length
+                    ? 'Found ' + hrDeviceOrder.length + ' compatible heart-rate sensor(s). Select one to connect.'
+                    : 'No compatible heart-rate sensors found. Wake your watch, enable Broadcast Heart Rate, then scan again.';
+                renderHrDeviceList('No compatible heart-rate sensors found. Wake your watch and scan again.');
+            } catch (error) {
+                if (generation !== hrScanGeneration) return;
+                var message = error && error.message ? error.message : 'Could not scan for Bluetooth devices.';
+                if (/cancel|selected/i.test(message) && !hrDevicePickerOpen) return;
+                if (status) status.textContent = message;
+                renderHrDeviceList('Scan failed. Check Bluetooth availability and try again.');
+                if (!/cancel|selected/i.test(message)) console.error('My PC HR device scan failed:', error);
+            } finally {
+                if (generation === hrScanGeneration) hrScanInFlight = false;
+            }
+        }
+        function closeHrDevicePicker(cancelScan) {
+            showHrDevicePicker(false);
+            hrScanGeneration++;
+            if (cancelScan && isMyPcBluetoothMode()) {
+                MyPC.bluetooth.cancelScan().catch(function () {});
+                hrScanInFlight = false;
+                hostBleConnecting = false;
+                if (!isConnected) setConnectionButtonDisconnected();
+            }
+        }
+        async function connectToHrDevice(deviceId) {
+            if (!isMyPcBluetoothMode() || !deviceId) return;
+            var selected = hrDiscoveredDevices[deviceId];
+            if (!selected) {
+                showToast('That sensor is no longer in the scan list. Scan again.', '⚠️');
+                return;
+            }
+            showHrDevicePicker(false);
+            hrScanGeneration++;
+            hrScanInFlight = false;
+            hostBleConnecting = true;
+            connText.textContent = 'Connecting to ' + (selected.name || 'heart-rate sensor') + '…';
+            connDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+            connectBtnText.textContent = 'Connecting…';
+            try {
+                await MyPC.bluetooth.connect(deviceId);
+            } catch (error) {
+                hostBleConnecting = false;
+                console.error('My PC BLE connection failed:', error);
+                if (!isConnected) setConnectionButtonDisconnected();
+                var message = error && error.message ? error.message : 'Could not connect to the selected sensor.';
+                if (!/cancel|selected/i.test(message)) showToast(message, '⚠️');
+            }
+        }
+
+        function isMyPcBluetoothMode() {
+            return !!(window.MyPC && typeof MyPC.isHosted === 'function' && MyPC.isHosted() &&
+                MyPC.bluetooth && typeof MyPC.bluetooth.connect === 'function');
+        }
+        function setConnectionButtonConnected(deviceName) {
+            isConnected = true;
+            connText.textContent = deviceName || 'Heart-rate sensor';
+            connDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+            connectBtnText.textContent = 'Disconnect Device';
+            connectBtn.classList.remove('from-rose-600', 'to-orange-600');
+            connectBtn.classList.add('from-slate-700', 'to-slate-800');
+        }
+        function setConnectionButtonDisconnected() {
+            isConnected = false;
+            connText.textContent = 'Disconnected';
+            connDot.className = 'w-2 h-2 rounded-full bg-amber-500';
+            connectBtnText.textContent = 'Connect Garmin FR55';
+            connectBtn.classList.add('from-rose-600', 'to-orange-600');
+            connectBtn.classList.remove('from-slate-700', 'to-slate-800');
+        }
+        async function toggleConnection() {
+            if (isSimulating) await toggleSimulation();
+            if (isMyPcBluetoothMode() && hostBleConnecting) { disconnectDevice(); return; }
+            if (isConnected) { disconnectDevice(); return; }
+
+            if (isMyPcBluetoothMode()) {
+                openHrDevicePicker();
+                return;
+            }
+
+            /* Normal browser fallback: Chrome/Edge Web Bluetooth. */
+            if (!navigator.bluetooth) {
+                showToast('Web Bluetooth is not supported in this browser. Inside Samsung TV use the My PC native BLE bridge.', '⚠️');
+                return;
+            }
+            try {
+                connText.textContent = 'Connecting…';
+                connDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+                bluetoothDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: ['heart_rate'] }] });
+                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+                const server = await bluetoothDevice.gatt.connect();
+                const service = await server.getPrimaryService('heart_rate');
+                heartRateCharacteristic = await service.getCharacteristic('heart_rate_measurement');
+                await heartRateCharacteristic.startNotifications();
+                heartRateCharacteristic.addEventListener('characteristicvaluechanged', handleHeartRateData);
+                setConnectionButtonConnected(bluetoothDevice.name || 'Heart-rate sensor');
+                showToast(`Connected to ${bluetoothDevice.name || 'Heart Rate Monitor'}!`, '⚡');
+            } catch (error) {
+                console.error('Bluetooth connection failed:', error);
+                setConnectionButtonDisconnected();
+                showToast('Connection cancelled or Bluetooth not available.', '❌');
+            }
+        }
+        function disconnectDevice() {
+            if (isMyPcBluetoothMode()) {
+                hostBleConnecting = false;
+                MyPC.bluetooth.disconnect().catch(function (error) {
+                    console.error('My PC BLE disconnect failed:', error);
+                    showToast(error && error.message ? error.message : 'Could not disconnect Bluetooth.', '⚠️');
+                });
+                return;
+            }
+            if (heartRateCharacteristic) {
+                try { heartRateCharacteristic.removeEventListener('characteristicvaluechanged', handleHeartRateData); } catch (e) {}
+                try { heartRateCharacteristic.stopNotifications().catch(function (err) { console.log(err); }); } catch (e) {}
+                heartRateCharacteristic = null;
+            }
+            if (bluetoothDevice && bluetoothDevice.gatt && bluetoothDevice.gatt.connected) bluetoothDevice.gatt.disconnect();
+            onDisconnected();
+        }
+        function onDisconnected() {
+            hostBleConnecting = false;
+            setConnectionButtonDisconnected();
+            showToast('Device disconnected.', '🔌');
+        }
+
+        function handleHeartRateData(event) {
+            const value = event.target.value;
+            const flags = value.getUint8(0);
+            
+            const is16Bit = (flags & 0x01) !== 0;
+            let hrValue = 0;
+            let index = 1;
+
+            if (is16Bit) {
+                hrValue = value.getUint16(index, true);
+                index += 2;
+            } else {
+                hrValue = value.getUint8(index);
+                index += 1;
+            }
+
+            const contactBit = (flags >> 1) & 0x03;
+            let contactStatus = "Waiting";
+            if (contactBit === 2) contactStatus = "Not Detected";
+            else if (contactBit === 3) contactStatus = "Detected";
+
+            let energy = null;
+            const energyPresent = (flags & 0x08) !== 0;
+            if (energyPresent) {
+                energy = value.getUint16(index, true);
+                index += 2;
+            }
+
+            let rrIntervals = [];
+            const rrPresent = (flags & 0x10) !== 0;
+            if (rrPresent) {
+                while (index + 1 <= value.byteLength) {
+                    const rrRaw = value.getUint16(index, true);
+                    const rrMs = Math.round((rrRaw / 1024) * 1000);
+                    rrIntervals.push(rrMs);
+                    index += 2;
+                }
+            }
+
+            updateTelemetry(hrValue, contactStatus, energy, rrIntervals.length > 0 ? rrIntervals[rrIntervals.length - 1] : null);
+        }
+
+        function updateTelemetry(bpm, contact = null, energy = null, rr = null) {
+            currentBpm = bpm;
+            bpmDisplay.textContent = bpm;
+
+            pulseHeart(bpm);
+
+            if (minBpm === 0 || bpm < minBpm) minBpm = bpm;
+            if (bpm > maxBpm) maxBpm = bpm;
+
+            sumBpm += bpm;
+            countBpm++;
+            const avgBpm = Math.round(sumBpm / countBpm);
+
+            statMax.textContent = maxBpm;
+            statMin.textContent = minBpm;
+            statAvg.textContent = avgBpm;
+
+            maxBar.style.width = Math.min(100, (maxBpm / 200) * 100) + '%';
+            minBar.style.width = Math.min(100, (minBpm / 200) * 100) + '%';
+
+            if (energy !== null) {
+                energyExpended = energy;
+                statEnergy.textContent = energyExpended;
+            }
+
+            if (rr !== null) {
+                lastRrInterval = rr;
+                rrIntervalInfo.textContent = `RR: ${lastRrInterval} ms`;
+            }
+
+            if (contact !== null) {
+                contactText.textContent = `Sensor: ${contact}`;
+                if (contact === 'Detected') {
+                    contactBadge.className = "px-2.5 py-1 rounded-md bg-emerald-950/60 border border-emerald-800/80 text-[10px] font-medium text-emerald-300 flex items-center space-x-1.5";
+                    contactIcon.classList.remove('text-slate-500');
+                    contactIcon.classList.add('text-emerald-400');
+                } else {
+                    contactBadge.className = "px-2.5 py-1 rounded-md bg-amber-950/60 border border-amber-800/80 text-[10px] font-medium text-amber-300 flex items-center space-x-1.5";
+                    contactIcon.classList.remove('text-slate-500');
+                    contactIcon.classList.add('text-amber-400');
+                }
+            }
+
+            hrChartData.shift();
+            hrChartData.push(bpm);
+            drawChart();
+        }
+
+        function pulseHeart(bpm) {
+            const duration = 60 / Math.max(40, Math.min(200, bpm));
+            heartContainer.style.animationDuration = `${duration}s`;
+        }
+
+        /* HR BLE test mode v1: on My PC, simulation originates in the host bridge. */
+        function setSimulationButtonState(active) {
+            var hostedMode = isMyPcBluetoothMode();
+            simBtn.textContent = active
+                ? (hostedMode ? 'Stop Test Data' : 'Stop Simulation')
+                : (hostedMode ? 'Start Test Data' : 'Simulate HR');
+            simBtn.className = active
+                ? 'flex-1 sm:flex-none px-4 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-medium text-xs transition-colors shadow-lg shadow-rose-600/30'
+                : 'flex-1 sm:flex-none px-4 py-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 rounded-xl font-medium text-xs transition-colors';
+        }
+
+        async function toggleSimulation() {
+            if (isMyPcBluetoothMode()) {
+                if (isSimulating) {
+                    try {
+                        await MyPC.bluetooth.stopTest();
+                    } catch (error) {
+                        console.error('Could not stop My PC test data:', error);
+                        showToast(error && error.message ? error.message : 'Could not stop test data.', '⚠️');
+                    }
+                    isSimulating = false;
+                    clearInterval(simulationInterval);
+                    simulationInterval = null;
+                    setSimulationButtonState(false);
+                    if (!isConnected) setConnectionButtonDisconnected();
+                    showToast('Stopped My PC test data.', '🛑');
+                    return;
+                }
+
+                /* The host cancels any scan and disconnects a real sensor before simulating. */
+                isConnected = false;
+                hostBleConnecting = false;
+                isSimulating = true;
+                setSimulationButtonState(true);
+                connText.textContent = 'Starting test data…';
+                connDot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+                try {
+                    await MyPC.bluetooth.startTest();
+                } catch (error) {
+                    isSimulating = false;
+                    setSimulationButtonState(false);
+                    setConnectionButtonDisconnected();
+                    console.error('Could not start My PC test data:', error);
+                    showToast(error && error.message ? error.message : 'Could not start test data.', '⚠️');
+                }
+                return;
+            }
+
+            /* Standalone browser fallback: retain the original local simulation. */
+            if (isConnected) disconnectDevice();
+            isSimulating = !isSimulating;
+            setSimulationButtonState(isSimulating);
+            if (isSimulating) {
+                connText.textContent = 'Simulating FR55';
+                connDot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+                showToast('Started HR simulation mode.', '🧪');
+                var simBpm = 115;
+                var calories = 45;
+                updateTelemetry(simBpm, 'Detected', calories, 620);
+                simulationInterval = setInterval(function () {
+                    var delta = Math.floor(Math.random() * 5) - 2;
+                    simBpm = Math.max(90, Math.min(175, simBpm + delta));
+                    calories += Math.random() < 0.2 ? 1 : 0;
+                    var rrSim = Math.round(60000 / simBpm + (Math.random() * 40 - 20));
+                    updateTelemetry(simBpm, 'Detected', calories, rrSim);
+                }, 1000);
+            } else {
+                clearInterval(simulationInterval);
+                simulationInterval = null;
+                if (!isConnected) setConnectionButtonDisconnected();
+                showToast('Stopped HR simulation.', '🛑');
+            }
+        }
+        function clearData() {
+            currentBpm = 0;
+            maxBpm = 0;
+            minBpm = 0;
+            sumBpm = 0;
+            countBpm = 0;
+            energyExpended = 0;
+            lastRrInterval = null;
+
+            bpmDisplay.textContent = "--";
+            statMax.textContent = "0";
+            statMin.textContent = "0";
+            statAvg.textContent = "0";
+            statEnergy.textContent = "0";
+            rrIntervalInfo.textContent = "RR: -- ms";
+            maxBar.style.width = "0%";
+            minBar.style.width = "0%";
+            hrChartData = new Array(maxChartPoints).fill(0);
+            drawChart();
+            showToast("Session telemetry reset.", "🔄");
+        }
+
+        function saveCurrentWorkout() {
+            if (countBpm === 0 && timerSeconds === 0) {
+                showToast("No workout data recorded yet to save.", "⚠️");
+                return;
+            }
+
+            const avgBpm = countBpm > 0 ? Math.round(sumBpm / countBpm) : 0;
+            const hrs = String(Math.floor(timerSeconds / 3600)).padStart(2, '0');
+            const mins = String(Math.floor((timerSeconds % 3600) / 60)).padStart(2, '0');
+            const secs = String(timerSeconds % 60).padStart(2, '0');
+            const durationFormatted = `${hrs}:${mins}:${secs}`;
+
+            const now = new Date();
+            const dateStr = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const newWorkout = {
+                id: Date.now(),
+                date: `${dateStr}, ${timeStr}`,
+                duration: durationFormatted,
+                durationSec: timerSeconds,
+                maxBpm: maxBpm,
+                minBpm: minBpm > 0 ? minBpm : 0,
+                avgBpm: avgBpm,
+                calories: energyExpended
+            };
+
+            savedWorkouts.unshift(newWorkout);
+            try {
+                localStorage.setItem('garmin_saved_workouts', JSON.stringify(savedWorkouts));
+            } catch (e) {
+                console.error("Could not save to localStorage", e);
+            }
+
+            renderWorkoutHistory();
+            showToast("Workout session saved successfully!", "💾");
+        }
+
+        function loadWorkoutHistory() {
+            try {
+                const stored = localStorage.getItem('garmin_saved_workouts');
+                if (stored) {
+                    savedWorkouts = JSON.parse(stored);
+                    renderWorkoutHistory();
+                }
+            } catch (e) {
+                console.error("Could not load from localStorage", e);
+            }
+        }
+
+        function deleteWorkout(id) {
+            savedWorkouts = savedWorkouts.filter(w => w.id !== id);
+            try {
+                localStorage.setItem('garmin_saved_workouts', JSON.stringify(savedWorkouts));
+            } catch (e) {
+                console.error(e);
+            }
+            renderWorkoutHistory();
+            showToast("Workout deleted.", "🗑️");
+        }
+
+        function renderWorkoutHistory() {
+            const listEl = document.getElementById('workout-history-list');
+            if (!savedWorkouts || savedWorkouts.length === 0) {
+                listEl.innerHTML = `
+                    <div class="text-center py-6 text-xs text-slate-500 italic">
+                        No saved workout sessions yet. Click "Save Session" after your workout to store it here.
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            savedWorkouts.forEach(w => {
+                html += `
+                    <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs font-bold text-slate-200">${w.date}</span>
+                                <span class="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-rose-400 font-mono font-semibold">${w.duration}</span>
+                            </div>
+                            <div class="flex items-center space-x-3 mt-1 text-[11px] text-slate-400">
+                                <span>Avg: <strong class="text-amber-400">${w.avgBpm} bpm</strong></span>
+                                <span>Max: <strong class="text-rose-400">${w.maxBpm} bpm</strong></span>
+                                <span>Cal: <strong class="text-orange-400">${w.calories} kcal</strong></span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 self-end sm:self-center">
+                            <button onclick="deleteWorkout(${w.id})" class="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-rose-400 rounded-lg transition-colors" title="Delete Session">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        }
+
+        function exportWorkoutsCSV() {
+            if (!savedWorkouts || savedWorkouts.length === 0) {
+                showToast("No workout sessions to export.", "⚠️");
+                return;
+            }
+
+            let csv = 'Date,Duration,Avg BPM,Max BPM,Min BPM,Calories (kcal)\n';
+            savedWorkouts.forEach(w => {
+                csv += `"${w.date}","${w.duration}",${w.avgBpm},${w.maxBpm},${w.minBpm},${w.calories}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `garmin_workouts_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast("Workouts exported as CSV!", "📥");
+        }
+
+        function toggleTimer() {
+            isTimerRunning = !isTimerRunning;
+            if (isTimerRunning) {
+                timerToggleBtn.className = "px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-xs shadow-md transition-colors flex items-center space-x-1.5";
+                timerBtnText.textContent = "Pause";
+                timerInterval = setInterval(() => {
+                    timerSeconds++;
+                    updateTimerDisplay();
+                }, 1000);
+            } else {
+                timerToggleBtn.className = "px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-xs shadow-md transition-colors flex items-center space-x-1.5";
+                timerBtnText.textContent = "Resume";
+                clearInterval(timerInterval);
+            }
+        }
+
+        function resetTimer() {
+            isTimerRunning = false;
+            clearInterval(timerInterval);
+            timerSeconds = 0;
+            updateTimerDisplay();
+            timerToggleBtn.className = "px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl text-xs shadow-md transition-colors flex items-center space-x-1.5";
+            timerBtnText.textContent = "Start";
+        }
+
+        function updateTimerDisplay() {
+            const hrs = String(Math.floor(timerSeconds / 3600)).padStart(2, '0');
+            const mins = String(Math.floor((timerSeconds % 3600) / 60)).padStart(2, '0');
+            const secs = String(timerSeconds % 60).padStart(2, '0');
+            timerDisplay.textContent = `${hrs}:${mins}:${secs}`;
+        }
+
+        const canvas = document.getElementById('hr-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function initCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
+            drawChart();
+        }
+
+        function drawChart() {
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            if (!width || !height) return;
+
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, height * 0.25); ctx.lineTo(width, height * 0.25);
+            ctx.moveTo(0, height * 0.50); ctx.lineTo(width, height * 0.50);
+            ctx.moveTo(0, height * 0.75); ctx.lineTo(width, height * 0.75);
+            ctx.stroke();
+
+            const maxVal = Math.max(180, ...hrChartData) + 10;
+            const minVal = Math.max(40, Math.min(...hrChartData.filter(v => v > 0)) - 10);
+            const range = maxVal - minVal || 1;
+
+            const stepX = width / (maxChartPoints - 1);
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0, 'rgba(255, 51, 102, 0.3)');
+            gradient.addColorStop(1, 'rgba(255, 51, 102, 0.0)');
+
+            ctx.beginPath();
+            ctx.moveTo(0, height);
+            for (let i = 0; i < hrChartData.length; i++) {
+                const val = hrChartData[i];
+                const x = i * stepX;
+                const y = val === 0 ? height : height - ((val - minVal) / range) * (height - 10) - 5;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.lineTo(width, height);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            ctx.beginPath();
+            let started = false;
+            for (let i = 0; i < hrChartData.length; i++) {
+                const val = hrChartData[i];
+                if (val === 0) continue;
+                const x = i * stepX;
+                const y = height - ((val - minVal) / range) * (height - 10) - 5;
+                if (!started) {
+                    ctx.moveTo(x, y);
+                    started = true;
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.strokeStyle = '#ff3366';
+            ctx.lineWidth = 2.5;
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+        }
+
+function getRemoteFocusable() {
+    var picker = document.getElementById('hr-device-picker');
+    var pickerOpen = picker && picker.classList.contains('opacity-100');
+    var tutorial = document.getElementById('tutorial-modal');
+    var tutorialOpen = tutorial && tutorial.classList.contains('opacity-100');
+    return Array.prototype.slice.call(document.querySelectorAll(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
+    )).filter(function (element) {
+        if (pickerOpen) return !!element.closest('#hr-device-picker');
+        if (tutorialOpen) return !!element.closest('#tutorial-modal');
+        if (element.closest('#hr-device-picker') || element.closest('#tutorial-modal')) return false;
+        var style = window.getComputedStyle(element);
+        return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
+    });
+}
+function moveRemoteFocus(direction) {
+    var items = getRemoteFocusable();
+
+    if (!items.length) return;
+
+    var current = document.activeElement;
+
+    if (items.indexOf(current) === -1) {
+        items[0].focus();
+        return;
+    }
+
+    var currentRect = current.getBoundingClientRect();
+    var currentX = currentRect.left + currentRect.width / 2;
+    var currentY = currentRect.top + currentRect.height / 2;
+
+    var best = null;
+    var bestScore = Infinity;
+
+    items.forEach(function (element) {
+        if (element === current) return;
+
+        var rect = element.getBoundingClientRect();
+        var x = rect.left + rect.width / 2;
+        var y = rect.top + rect.height / 2;
+        var dx = x - currentX;
+        var dy = y - currentY;
+
+        var horizontal =
+            direction === 'left' || direction === 'right';
+
+        var forward =
+            direction === 'left' ? dx < -1 :
+            direction === 'right' ? dx > 1 :
+            direction === 'up' ? dy < -1 :
+            direction === 'down' ? dy > 1 : false;
+
+        if (!forward) return;
+
+        var primary = horizontal ? Math.abs(dx) : Math.abs(dy);
+        var cross = horizontal ? Math.abs(dy) : Math.abs(dx);
+        var score = primary + cross * 1.5;
+
+        if (score < bestScore) {
+            bestScore = score;
+            best = element;
+        }
+    });
+
+    if (best) best.focus();
+}
+
+function handleMyPcInput(action, pressed) {
+    if (!pressed) return;
+    var picker = document.getElementById('hr-device-picker');
+    var pickerOpen = picker && picker.classList.contains('opacity-100');
+    var tutorial = document.getElementById('tutorial-modal');
+    var tutorialOpen = tutorial && tutorial.classList.contains('opacity-100');
+    if (action === 'cancel') {
+        if (pickerOpen) closeHrDevicePicker(true);
+        else if (tutorialOpen) toggleTutorialModal(false);
+        return;
+    }
+    if (action === 'confirm') {
+        var items = getRemoteFocusable();
+        var active = document.activeElement;
+        if (items.indexOf(active) !== -1) active.click();
+        else if (items.length) items[0].focus();
+        return;
+    }
+    if (action === 'left' || action === 'right' || action === 'up' || action === 'down') {
+        moveRemoteFocus(action);
+    }
+}
+
+
+        var hostBleUnsubscribers = [];
+        var hostBleHandlersInstalled = false;
+        function installHostBluetoothHandlers() {
+            if (hostBleHandlersInstalled || !isMyPcBluetoothMode()) return;
+            hostBleHandlersInstalled = true;
+            setSimulationButtonState(false);
+            hostBleUnsubscribers.push(MyPC.bluetooth.on('device-found', handleHrHostDeviceFound));
+            hostBleUnsubscribers.push(MyPC.bluetooth.on('reading', function (reading) {
+                if (!reading || typeof reading.bpm !== 'number' || reading.bpm <= 0) return;
+                updateTelemetry(reading.bpm,
+                    reading.contact == null ? null : reading.contact,
+                    reading.energy == null ? null : reading.energy,
+                    reading.rr == null ? null : reading.rr);
+            }));
+            hostBleUnsubscribers.push(MyPC.bluetooth.on('status', function (event) {
+                if (!event || !event.status) return;
+                if (hrDevicePickerOpen && event.status === 'scanning') {
+                    var pickerStatus = document.getElementById('hr-device-picker-status');
+                    if (pickerStatus) pickerStatus.textContent = event.message || 'Scanning for heart-rate sensors…';
+                } else if (hrDevicePickerOpen && event.status === 'scan-complete') {
+                    var doneStatus = document.getElementById('hr-device-picker-status');
+                    if (doneStatus && !hrDeviceOrder.length) doneStatus.textContent = 'No compatible sensors found. Wake your watch and scan again.';
+                }
+                if (event.status === 'test') {
+                    hostBleConnecting = false;
+                    isConnected = false;
+                    isSimulating = true;
+                    setSimulationButtonState(true);
+                    connText.textContent = 'My PC Test Data';
+                    connDot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+                    showToast('My PC is sending simulated heart-rate data.', '🧪');
+                } else if (event.status === 'test-stopped') {
+                    isSimulating = false;
+                    setSimulationButtonState(false);
+                    if (!isConnected) setConnectionButtonDisconnected();
+                } else if (event.status === 'scanning') {
+                    hostBleConnecting = true;
+                    connText.textContent = 'Scanning for heart-rate sensor…';
+                    connDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+                    connectBtnText.textContent = 'Searching…';
+                } else if (event.status === 'connecting') {
+                    hostBleConnecting = true;
+                    connText.textContent = event.deviceName || 'Connecting…';
+                    connDot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+                    connectBtnText.textContent = 'Connecting…';
+                } else if (event.status === 'connected') {
+                    showHrDevicePicker(false);
+                    hrScanGeneration++;
+                    hrScanInFlight = false;
+                    hostBleConnecting = false;
+                    isSimulating = false;
+                    setSimulationButtonState(false);
+                    setConnectionButtonConnected(event.deviceName);
+                    showToast('Connected to ' + (event.deviceName || 'heart-rate sensor') + '.', '⚡');
+                } else if (event.status === 'disconnected') {
+                    hostBleConnecting = false;
+                    isSimulating = false;
+                    setSimulationButtonState(false);
+                    onDisconnected();
+                } else if (event.status === 'error') {
+                    hostBleConnecting = false;
+                    isSimulating = false;
+                    setSimulationButtonState(false);
+                    setConnectionButtonDisconnected();
+                    /* toggleConnection() reports the rejection so errors are not toasted twice. */
+                }
+            }));
+        }
+
+if (window.MyPC && typeof MyPC.init === 'function') {
+    MyPC.init({
+        onInit: function (info) {
+            installHostBluetoothHandlers();
+            initializeHrUi();
+            MyPC.ready();
+        },
+
+        onStart: function () {
+            var items = getRemoteFocusable();
+
+            if (items.length) {
+                connectBtn.focus();
+            }
+        },
+
+        onPause: function () {
+            // Pause simulation and workout-timer intervals here.
+        },
+
+        onResume: function () {
+            // Resume intervals that were active before pausing.
+        },
+
+        onDestroy: function () {
+            clearInterval(simulationInterval);
+            clearInterval(timerInterval);
+            window.removeEventListener('resize', initCanvas);
+            hostBleUnsubscribers.forEach(function (unsubscribe) {
+                try { if (typeof unsubscribe === 'function') unsubscribe(); } catch (e) {}
+            });
+            hostBleUnsubscribers = [];
+            /* The My PC host disconnects native BLE before it destroys this iframe. */
+        },
+
+        onInput: function (action, pressed, repeat, dev) {
+            handleMyPcInput(action, pressed);
+        }
+    });
+} else {
+    // Preserve normal browser use outside My PC.
+    initializeHrUi();
+}
+    </script>
+</body>
+</html>
