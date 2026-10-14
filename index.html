@@ -252,6 +252,32 @@
             </div>
         </div>
 
+        <!-- Workout History & Saved Sessions Card -->
+        <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-4 shadow-xl space-y-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-300">Saved Workout Sessions</h2>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="saveCurrentWorkout()" class="px-3 py-1.5 bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-500 hover:to-orange-500 text-white font-semibold rounded-lg text-xs shadow-md transition-all flex items-center space-x-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                        <span>Save Session</span>
+                    </button>
+                    <button onclick="exportWorkoutsCSV()" class="px-2.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-xs font-medium transition-colors" title="Export CSV">
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Workout List Container -->
+            <div id="workout-history-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                <div class="text-center py-6 text-xs text-slate-500 italic">
+                    No saved workout sessions yet. Click "Save Session" after your workout to store it here.
+                </div>
+            </div>
+        </div>
+
         <!-- Quick Garmin Tutorial Teaser Card -->
         <div class="bg-gradient-to-r from-slate-800 to-slate-850 border border-slate-700/60 rounded-2xl p-4 flex items-center justify-between">
             <div class="flex items-center space-x-3">
@@ -382,6 +408,9 @@
         let timerInterval = null;
         let isTimerRunning = false;
 
+        // Workout History state
+        let savedWorkouts = [];
+
         // DOM Elements
         const connectBtn = document.getElementById('connect-btn');
         const connectBtnText = document.getElementById('connect-btn-text');
@@ -412,6 +441,7 @@
             }
             initCanvas();
             window.addEventListener('resize', initCanvas);
+            loadWorkoutHistory();
         });
 
         // Toast Notification Function
@@ -685,6 +715,127 @@
             hrChartData = new Array(maxChartPoints).fill(0);
             drawChart();
             showToast("Session telemetry reset.", "🔄");
+        }
+
+        // Save Current Workout Session
+        function saveCurrentWorkout() {
+            if (countBpm === 0 && timerSeconds === 0) {
+                showToast("No workout data recorded yet to save.", "⚠️");
+                return;
+            }
+
+            const avgBpm = countBpm > 0 ? Math.round(sumBpm / countBpm) : 0;
+            const hrs = String(Math.floor(timerSeconds / 3600)).padStart(2, '0');
+            const mins = String(Math.floor((timerSeconds % 3600) / 60)).padStart(2, '0');
+            const secs = String(timerSeconds % 60).padStart(2, '0');
+            const durationFormatted = `${hrs}:${mins}:${secs}`;
+
+            const now = new Date();
+            const dateStr = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const newWorkout = {
+                id: Date.now(),
+                date: `${dateStr}, ${timeStr}`,
+                duration: durationFormatted,
+                durationSec: timerSeconds,
+                maxBpm: maxBpm,
+                minBpm: minBpm > 0 ? minBpm : 0,
+                avgBpm: avgBpm,
+                calories: energyExpended
+            };
+
+            savedWorkouts.unshift(newWorkout);
+            try {
+                localStorage.setItem('garmin_saved_workouts', JSON.stringify(savedWorkouts));
+            } catch (e) {
+                console.error("Could not save to localStorage", e);
+            }
+
+            renderWorkoutHistory();
+            showToast("Workout session saved successfully!", "💾");
+        }
+
+        function loadWorkoutHistory() {
+            try {
+                const stored = localStorage.getItem('garmin_saved_workouts');
+                if (stored) {
+                    savedWorkouts = JSON.parse(stored);
+                    renderWorkoutHistory();
+                }
+            } catch (e) {
+                console.error("Could not load from localStorage", e);
+            }
+        }
+
+        function deleteWorkout(id) {
+            savedWorkouts = savedWorkouts.filter(w => w.id !== id);
+            try {
+                localStorage.setItem('garmin_saved_workouts', JSON.stringify(savedWorkouts));
+            } catch (e) {
+                console.error(e);
+            }
+            renderWorkoutHistory();
+            showToast("Workout deleted.", "🗑️");
+        }
+
+        function renderWorkoutHistory() {
+            const listEl = document.getElementById('workout-history-list');
+            if (!savedWorkouts || savedWorkouts.length === 0) {
+                listEl.innerHTML = `
+                    <div class="text-center py-6 text-xs text-slate-500 italic">
+                        No saved workout sessions yet. Click "Save Session" after your workout to store it here.
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            savedWorkouts.forEach(w => {
+                html += `
+                    <div class="bg-slate-900/60 border border-slate-700/50 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs font-bold text-slate-200">${w.date}</span>
+                                <span class="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-rose-400 font-mono font-semibold">${w.duration}</span>
+                            </div>
+                            <div class="flex items-center space-x-3 mt-1 text-[11px] text-slate-400">
+                                <span>Avg: <strong class="text-amber-400">${w.avgBpm} bpm</strong></span>
+                                <span>Max: <strong class="text-rose-400">${w.maxBpm} bpm</strong></span>
+                                <span>Cal: <strong class="text-orange-400">${w.calories} kcal</strong></span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 self-end sm:self-center">
+                            <button onclick="deleteWorkout(${w.id})" class="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-rose-400 rounded-lg transition-colors" title="Delete Session">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        }
+
+        function exportWorkoutsCSV() {
+            if (!savedWorkouts || savedWorkouts.length === 0) {
+                showToast("No workout sessions to export.", "⚠️");
+                return;
+            }
+
+            let csv = 'Date,Duration,Avg BPM,Max BPM,Min BPM,Calories (kcal)\n';
+            savedWorkouts.forEach(w => {
+                csv += `"${w.date}","${w.duration}",${w.avgBpm},${w.maxBpm},${w.minBpm},${w.calories}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `garmin_workouts_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast("Workouts exported as CSV!", "📥");
         }
 
         // Workout Timer Logic
