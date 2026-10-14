@@ -478,16 +478,35 @@ textarea:focus {
         const bleWarning = document.getElementById('ble-warning');
         const heartContainer = document.getElementById('heart-container');
 
-        window.addEventListener('DOMContentLoaded', () => {
-            if (!navigator.bluetooth) {
-                bleWarning.classList.remove('hidden');
-            } else {
-                bleWarning.classList.remove('hidden'); // Show info on PC
-            }
-            initCanvas();
-            window.addEventListener('resize', initCanvas);
-            loadWorkoutHistory();
-        });
+
+        let hrUiInitialized = false;
+
+function initializeHrUi() {
+    // Prevent initialization from running twice.
+    if (hrUiInitialized) return;
+    hrUiInitialized = true;
+
+    // Bluetooth compatibility notice.
+    bleWarning.classList.remove('hidden');
+
+    // Initialize dashboard.
+    initCanvas();
+    window.addEventListener('resize', initCanvas);
+    loadWorkoutHistory();
+}
+
+// Ensure the DOM exists before initialization.
+if (document.readyState === 'loading') {
+    document.addEventListener(
+        'DOMContentLoaded',
+        initializeHrUi,
+        { once: true }
+    );
+} else {
+    initializeHrUi();
+}
+
+
 
         function showToast(message, icon = 'ℹ️') {
             const toast = document.getElementById('toast');
