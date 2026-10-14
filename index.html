@@ -142,6 +142,88 @@ textarea:focus {
     }
 }
     </style>
+
+<!-- hr-readable-desktop-ui-v1: desktop/TV readability overrides -->
+<style id="hr-readable-desktop-ui-v1">
+/* Keep phone styling unchanged; improve readability on PCs, monitors and TVs. */
+@media screen and (min-width: 768px) {
+  body {
+    font-size: 16px !important;
+    line-height: 1.55;
+  }
+
+  /* The original max-w-lg caps the whole dashboard at about 32rem on a PC. */
+  body > main {
+    box-sizing: border-box !important;
+    width: min(1400px, calc(100% - 48px)) !important;
+    max-width: 1400px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+
+  /* Tailwind's text-xs is only 12px; make small labels and controls legible. */
+  [class~="text-xs"] {
+    font-size: 15px !important;
+    line-height: 1.45 !important;
+  }
+  [class~="text-[10px]"] {
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+  }
+  [class~="text-[11px]"] {
+    font-size: 14px !important;
+    line-height: 1.45 !important;
+  }
+  [class~="text-[9px]"] {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+  }
+  [class~="text-sm"] {
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+  }
+  [class~="text-base"] {
+    font-size: 18px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Larger controls are easier to read/click with a mouse or remote. */
+  button,
+  select,
+  input,
+  textarea {
+    font-size: max(15px, 1em) !important;
+  }
+  button {
+    min-height: 44px;
+  }
+
+  /* Make muted labels and status text retain readable contrast on dark cards. */
+  [class~="text-slate-500"] {
+    color: #aebbd0 !important;
+  }
+  [class~="text-slate-400"] {
+    color: #c1ccdc !important;
+  }
+
+  :focus-visible {
+    outline: 3px solid #22d3ee !important;
+    outline-offset: 3px !important;
+  }
+}
+
+/* Give smaller PC windows the same legibility without forcing a wide layout. */
+@media screen and (min-width: 768px) and (max-width: 1000px) {
+  body > main {
+    width: calc(100% - 24px) !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+}
+</style>
+
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-rose-500 selection:text-white">
 
