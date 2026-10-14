@@ -1,13 +1,11 @@
 {
   "mypc": 1,
   "id": "hr-monitor",
-  "name": "HR monitor",
-  "description": "HR monitor",
-  "type": "game",
+  "name": "HR Monitor",
+  "description": "Live heart-rate telemetry dashboard.",
+  "type": "app",
   "entry": "index.html",
   "icon": "icon.svg",
-  "version": "1.0.2",
-  "scores": true,
-  "config": { "speed": 1 },
-  "touch": { "buttons": [{ "label": "OK", "action": "ok" }], "catalog": [{ "label": "OK", "action": "ok" }, { "label": "B", "action": "run" }, { "label": "C", "action": "cancel" }] }
+  "version": "1.0.3",
+  "config": {}
 }
