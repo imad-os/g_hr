@@ -885,6 +885,52 @@
             ctx.lineJoin = 'round';
             ctx.stroke();
         }
+
+
+MyPC.init({
+    onInit: function (info) {
+        // Keep your existing DOMContentLoaded initialization.
+        MyPC.progress(1);
+        MyPC.ready();
+    },
+
+    onStart: function () {
+        // The dashboard is ready to display.
+    },
+
+    onPause: function () {
+        // Pause active simulation and workout updates.
+    },
+
+    onResume: function () {
+        // Resume previously active updates.
+    },
+
+    onDestroy: function () {
+        // Clean up timers and connected devices.
+        if (simulationInterval) {
+            clearInterval(simulationInterval);
+            simulationInterval = null;
+        }
+
+        if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+        }
+
+        if (
+            bluetoothDevice &&
+            bluetoothDevice.gatt &&
+            bluetoothDevice.gatt.connected
+        ) {
+            bluetoothDevice.gatt.disconnect();
+        }
+    },
+
+    onInput: function (action, pressed, repeat) {
+        // Handle My PC remote/gamepad actions here.
+    }
+});
     </script>
 </body>
 </html>
